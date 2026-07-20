@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: var(--primary);
+  --color-primary-start: var(--primary-gradient-start);
+  --color-primary-end: var(--primary-gradient-end);
+}
+
+:root {
+  --background: #fafafa;
+  --foreground: #09090b;
+  --card: #ffffff;
+  --card-foreground: #09090b;
+  --primary: var(--dynamic-primary, #c29853);
+  --primary-gradient-start: var(--dynamic-primary-start, #e5c07b);
+  --primary-gradient-end: var(--dynamic-primary-end, #c29853);
+  --secondary: #f4f4f5;
+  --secondary-foreground: #09090b;
+  --muted: #71717a;
+  --border: #e4e4e7;
+}
+
+.dark {
+  --background: #09090b;
+  --foreground: #f4f4f5;
+  --card: #18181b;
+  --card-foreground: #f4f4f5;
+  --secondary: #27272a;
+  --secondary-foreground: #f4f4f5;
+  --border: #27272a;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Tajawal', sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.dark .glass {
+  background: rgba(24, 24, 27, 0.75);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.gold-gradient, .primary-gradient {
+  background: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
+}
+
+.zinc-gradient {
+  background: linear-gradient(135deg, #27272a 0%, #09090b 100%);
+}
