@@ -109,8 +109,32 @@ export default function CommunityPage() {
   const handleModerateComment = async (id: string, status: 'APPROVED' | 'REJECTED' | 'HIDDEN') => {
     try {
       await api.patch(`/content/comments/${id}/moderate`, { status });
+      if (selected?.id === id) {
+        setSelected((prev: any) => ({ ...prev, status }));
+      }
+      if (selected?.comments) {
+        setSelected((prev: any) => ({
+          ...prev,
+          comments: prev.comments.map((c: any) => c.id === id ? { ...c, status } : c),
+        }));
+      }
       loadData();
     } catch (err) { showAlert(isRtl ? 'فشل تغيير حالة التعليق.' : 'Failed to moderate comment.', 'error'); }
+  };
+
+  const handleDeleteCommentOnPost = async (commentId: string) => {
+    if (!await showConfirm(isRtl ? 'حذف التعليق' : 'Delete Comment', isRtl ? 'هل أنت متأكد من حذف هذا التعليق نهائياً؟' : 'Are you sure you want to permanently delete this comment?')) return;
+    try {
+      await api.delete(`/content/comments/${commentId}`);
+      if (selected?.comments) {
+        setSelected((prev: any) => ({
+          ...prev,
+          comments: prev.comments.filter((c: any) => c.id !== commentId),
+        }));
+      }
+      showAlert(isRtl ? 'تم حذف التعليق بنجاح' : 'Comment deleted successfully', 'success');
+      loadData();
+    } catch (err) { showAlert(isRtl ? 'فشل حذف التعليق.' : 'Failed to delete comment.', 'error'); }
   };
 
   const handleToggleStatus = async (item: any) => {
@@ -282,7 +306,10 @@ export default function CommunityPage() {
                           <div className={`text-[10px] mt-0.5 line-clamp-2 ${theme === 'dark' ? 'text-zinc-400' : 'text-zinc-500'}`}>{comment.content}</div>
                         </td>
                         <td className="px-5 py-3.5 hidden md:table-cell">
-                          <span className={`text-[10px] px-2 py-1 rounded-lg font-semibold border ${theme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-zinc-400' : 'bg-zinc-100 border-zinc-200 text-zinc-500'}`}>
+                          <div className={`text-xs font-bold line-clamp-1 ${theme === 'dark' ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                            {comment.article?.titleAr || comment.news?.titleAr || comment.portfolioProject?.titleAr || (comment.articleId ? (isRtl ? 'مقالة هندسية' : 'Article') : (isRtl ? 'خبر عام' : 'News'))}
+                          </div>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-semibold border ${theme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-zinc-400' : 'bg-zinc-100 border-zinc-200 text-zinc-500'}`}>
                             {comment.articleId ? (isRtl ? 'مقالة' : 'Article') : comment.newsId ? (isRtl ? 'خبر' : 'News') : (isRtl ? 'معرض أعمال' : 'Portfolio')}
                           </span>
                         </td>
@@ -326,6 +353,9 @@ export default function CommunityPage() {
                   <tr className={`text-[11px] font-bold uppercase tracking-wider border-b ${theme === 'dark' ? 'bg-zinc-900/40 border-zinc-800 text-zinc-500' : 'bg-zinc-50/80 border-zinc-200 text-zinc-400'}`}>
                     <th className="px-5 py-3">{isRtl ? 'المنشور / المحتوى' : 'Post / Content'}</th>
                     <th className="px-5 py-3 hidden md:table-cell">{isRtl ? 'الملخص' : 'Summary'}</th>
+                    {activeSection !== 'testimonials' && (
+                      <th className="px-5 py-3 text-center">{isRtl ? 'الإعجابات والتعليقات' : 'Engagement'}</th>
+                    )}
                     <th className="px-5 py-3">{isRtl ? 'الحالة' : 'Status'}</th>
                     <th className="px-5 py-3 hidden lg:table-cell">{isRtl ? 'التاريخ' : 'Date'}</th>
                     <th className="px-5 py-3 text-center">{isRtl ? 'الإجراءات' : 'Actions'}</th>
@@ -368,6 +398,18 @@ export default function CommunityPage() {
                               : (isRtl ? item.contentAr || item.descriptionAr : item.contentEn || item.descriptionEn)}
                           </p>
                         </td>
+                        {activeSection !== 'testimonials' && (
+                          <td className="px-5 py-3.5 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border ${theme === 'dark' ? 'bg-red-950/20 text-red-400 border-red-800/40' : 'bg-red-50 text-red-600 border-red-200'}`} title={isRtl ? 'الإعجابات' : 'Likes'}>
+                                ❤️ {item.likes?.length ?? item.totalLikes ?? 0}
+                              </span>
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border ${theme === 'dark' ? 'bg-blue-950/20 text-blue-400 border-blue-800/40' : 'bg-blue-50 text-blue-600 border-blue-200'}`} title={isRtl ? 'التعليقات' : 'Comments'}>
+                                💬 {item.comments?.length ?? 0}
+                              </span>
+                            </div>
+                          </td>
+                        )}
                         <td className="px-5 py-3.5">
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${sm2.cls}`}>
                             <span className={`w-1.5 h-1.5 rounded-full ${sm2.dot}`} />
@@ -481,6 +523,85 @@ export default function CommunityPage() {
                           <span className={`text-xs font-bold ${theme === 'dark' ? 'text-zinc-200' : 'text-zinc-700'}`}>{selected.authorName}</span>
                         </div>
                       )}
+
+                      {/* Engagement stats (Likes & Comments) */}
+                      <div className={`p-3 rounded-xl border ${theme === 'dark' ? 'bg-zinc-800/40 border-zinc-700/60' : 'bg-zinc-50 border-zinc-200'}`}>
+                        <span className="block text-[10px] font-bold text-zinc-500 uppercase mb-2">{isRtl ? 'التفاعل والإحصائيات' : 'Engagement Metrics'}</span>
+                        <div className="grid grid-cols-2 gap-2 text-center">
+                          <div className={`p-2 rounded-lg border ${theme === 'dark' ? 'bg-red-950/20 border-red-800/40 text-red-400' : 'bg-red-50 border-red-200 text-red-600'}`}>
+                            <span className="text-base font-black">❤️ {selected.likes?.length ?? selected.totalLikes ?? 0}</span>
+                            <span className="block text-[10px] font-bold mt-0.5">{isRtl ? 'إعجاب' : 'Likes'}</span>
+                          </div>
+                          <div className={`p-2 rounded-lg border ${theme === 'dark' ? 'bg-blue-950/20 border-blue-800/40 text-blue-400' : 'bg-blue-50 border-blue-200 text-blue-600'}`}>
+                            <span className="text-base font-black">💬 {selected.comments?.length ?? 0}</span>
+                            <span className="block text-[10px] font-bold mt-0.5">{isRtl ? 'تعليق' : 'Comments'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Comments on this Post */}
+                      <div className={`p-3 rounded-xl border ${theme === 'dark' ? 'bg-zinc-800/40 border-zinc-700/60' : 'bg-zinc-50 border-zinc-200'} space-y-2.5`}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-zinc-500 uppercase">{isRtl ? 'التعليقات على هذا المنشور' : 'Comments on this Post'}</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                            {selected.comments?.length ?? 0}
+                          </span>
+                        </div>
+
+                        {selected.comments && selected.comments.length > 0 ? (
+                          <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                            {selected.comments.map((c: any) => {
+                              const csm = COMMENT_STATUS[c.status] ?? COMMENT_STATUS['PENDING'];
+                              return (
+                                <div key={c.id} className={`p-2.5 rounded-lg border text-xs space-y-1.5 ${theme === 'dark' ? 'bg-zinc-900/60 border-zinc-800' : 'bg-white border-zinc-200 shadow-2xs'}`}>
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="font-extrabold text-[11px] truncate">{c.customer?.name || (isRtl ? 'مستخدم' : 'User')}</span>
+                                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[9px] font-bold border shrink-0 ${csm.cls}`}>
+                                      <span className={`w-1 h-1 rounded-full ${csm.dot}`} />
+                                      {isRtl ? csm.label : csm.labelEn}
+                                    </span>
+                                  </div>
+                                  <p className={`text-[11px] leading-relaxed ${theme === 'dark' ? 'text-zinc-300' : 'text-zinc-650'}`}>{c.content}</p>
+                                  <div className="flex items-center justify-between pt-1 border-t border-zinc-800/30 text-[9px]">
+                                    <span className="text-zinc-500 font-mono">{new Date(c.createdAt).toLocaleDateString()}</span>
+                                    <div className="flex items-center gap-1.5">
+                                      {c.status !== 'APPROVED' && (
+                                        <button 
+                                          type="button" 
+                                          onClick={() => handleModerateComment(c.id, 'APPROVED')} 
+                                          className="text-emerald-500 hover:underline font-bold cursor-pointer"
+                                        >
+                                          {isRtl ? 'اعتماد' : 'Approve'}
+                                        </button>
+                                      )}
+                                      {c.status !== 'REJECTED' && (
+                                        <button 
+                                          type="button" 
+                                          onClick={() => handleModerateComment(c.id, 'REJECTED')} 
+                                          className="text-orange-500 hover:underline font-bold cursor-pointer"
+                                        >
+                                          {isRtl ? 'إيقاف' : 'Reject'}
+                                        </button>
+                                      )}
+                                      <button 
+                                        type="button" 
+                                        onClick={() => handleDeleteCommentOnPost(c.id)} 
+                                        className="text-red-500 hover:underline font-bold cursor-pointer"
+                                      >
+                                        {isRtl ? 'حذف' : 'Delete'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-[11px] text-zinc-500 italic py-2 text-center">
+                            {isRtl ? 'لا توجد تعليقات على هذا المنشور حتى الآن.' : 'No comments on this post yet.'}
+                          </div>
+                        )}
+                      </div>
                     </>
                   )}
 
