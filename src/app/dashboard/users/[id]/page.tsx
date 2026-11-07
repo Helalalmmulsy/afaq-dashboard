@@ -55,6 +55,8 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
   
   // Modals visibility
   const [showEditBasicModal, setShowEditBasicModal] = useState(false);
+  const [showBioModal, setShowBioModal] = useState(false);
+  const [bioInput, setBioInput] = useState('');
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showTimelineModal, setShowTimelineModal] = useState(false);
   const [showCertModal, setShowCertModal] = useState(false);
@@ -64,6 +66,7 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
   // Editing items state (null means creating new)
   const [editingProject, setEditingProject] = useState<ProjectItem | null>(null);
   const [editingTimeline, setEditingTimeline] = useState<TimelineItem | null>(null);
+  const [editingCertIndex, setEditingCertIndex] = useState<number | null>(null);
 
   // Form states
   const [basicForm, setBasicForm] = useState({
@@ -144,15 +147,21 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
 
       const profileObj = res.engineerProfile || res.contractorProfile || {};
       
-      // Load Custom values from LocalStorage or Fallback to Defaults
+      // Load Custom values from Database first, fallback to LocalStorage or Defaults
       const localProjects = localStorage.getItem(`user_${id}_projects`);
       const localTimeline = localStorage.getItem(`user_${id}_timeline`);
       const localReviews = localStorage.getItem(`user_${id}_reviews`);
       const localCity = localStorage.getItem(`user_${id}_city`);
       const localRoleTitle = localStorage.getItem(`user_${id}_roleTitle`);
 
-      const loadedProjects = localProjects ? JSON.parse(localProjects) : defaultProjects;
-      const loadedTimeline = localTimeline ? JSON.parse(localTimeline) : defaultTimeline;
+      const loadedProjects = (profileObj.customProjects && Array.isArray(profileObj.customProjects) && profileObj.customProjects.length > 0)
+        ? profileObj.customProjects
+        : (localProjects ? JSON.parse(localProjects) : defaultProjects);
+
+      const loadedTimeline = (profileObj.customExperiences && Array.isArray(profileObj.customExperiences) && profileObj.customExperiences.length > 0)
+        ? profileObj.customExperiences
+        : (localTimeline ? JSON.parse(localTimeline) : defaultTimeline);
+
       const loadedReviews = localReviews ? JSON.parse(localReviews) : defaultReviews;
       const loadedCity = localCity || (isRtl ? 'محافظة ذمار' : 'Dhamar Governorate');
       const loadedRoleTitle = localRoleTitle || (res.role?.name === 'ENGINEER' ? (isRtl ? 'مهندس معماري رئيسي' : 'Chief Architect') : (isRtl ? 'مؤسسة مقاولات عامة' : 'General Contracting'));
@@ -162,6 +171,7 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
       setReviews(loadedReviews);
       setCity(loadedCity);
       setRoleTitle(loadedRoleTitle);
+      setBioInput(profileObj.bio || '');
 
       setBasicForm({
         name: res.name || '',
@@ -326,7 +336,68 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
     }
   };
 
+  // ──────── BIO DIRECT EDIT / DELETE ────────
+  const handleOpenEditBio = () => {
+    const currentBio = user?.engineerProfile?.bio || user?.contractorProfile?.bio || '';
+    setBioInput(currentBio);
+    setShowBioModal(true);
+  };
+
+  const handleSaveBio = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload: any = {};
+      if (user.role?.name === 'ENGINEER') {
+        payload.engineerDetails = { ...user.engineerProfile, bio: bioInput.trim() };
+      } else {
+        payload.contractorDetails = { ...user.contractorProfile, bio: bioInput.trim() };
+      }
+      await api.patch(`/users/${id}`, payload);
+      setShowBioModal(false);
+      showAlert(isRtl ? 'تم تحديث النبذة بنجاح في السيرفر' : 'Bio updated successfully on server', 'success');
+      loadUser();
+    } catch (err) {
+      showAlert(isRtl ? 'فشل تحديث النبذة' : 'Failed to update bio', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteBio = async () => {
+    if (!await showConfirm(isRtl ? 'حذف النبذة المهنية' : 'Delete Bio', isRtl ? 'هل أنت متأكد من مسح وحذف النبذة المهنية بالكامل؟' : 'Are you sure you want to delete and clear the bio?')) return;
+    setSaving(true);
+    try {
+      const payload: any = {};
+      if (user.role?.name === 'ENGINEER') {
+        payload.engineerDetails = { ...user.engineerProfile, bio: '' };
+      } else {
+        payload.contractorDetails = { ...user.contractorProfile, bio: '' };
+      }
+      await api.patch(`/users/${id}`, payload);
+      showAlert(isRtl ? 'تم مسح النبذة بنجاح' : 'Bio cleared successfully', 'success');
+      loadUser();
+    } catch (err) {
+      showAlert(isRtl ? 'فشل مسح النبذة' : 'Failed to clear bio', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // ──────── CERTIFICATIONS CRUD ────────
+  const handleOpenAddCert = () => {
+    setEditingCertIndex(null);
+    setCertForm({ title: '', image: '' });
+    setShowCertModal(true);
+  };
+
+  const handleOpenEditCert = (certStr: string, index: number) => {
+    const cert = parseCertificate(certStr);
+    setEditingCertIndex(index);
+    setCertForm({ title: cert.title, image: cert.image || '' });
+    setShowCertModal(true);
+  };
+
   const handleAddCert = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!certForm.title.trim()) return;
@@ -337,28 +408,36 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
       image: certForm.image.trim() || undefined
     });
 
-    const currentCerts = user.engineerProfile?.certificates || user.contractorProfile?.certificates || [];
-    const updatedCerts = [...currentCerts, serializedCert];
+    const currentCerts = [...(user.engineerProfile?.certificates || user.contractorProfile?.certificates || [])];
+    if (editingCertIndex !== null && editingCertIndex >= 0 && editingCertIndex < currentCerts.length) {
+      currentCerts[editingCertIndex] = serializedCert;
+    } else {
+      currentCerts.push(serializedCert);
+    }
+
     setSaving(true);
     try {
       const payload: any = {};
       if (user.role?.name === 'ENGINEER') {
-        payload.engineerDetails = { ...user.engineerProfile, certificates: updatedCerts };
+        payload.engineerDetails = { ...user.engineerProfile, certificates: currentCerts };
       } else {
-        payload.contractorDetails = { ...user.contractorProfile, certificates: updatedCerts };
+        payload.contractorDetails = { ...user.contractorProfile, certificates: currentCerts };
       }
       await api.patch(`/users/${id}`, payload);
       setCertForm({ title: '', image: '' });
+      setEditingCertIndex(null);
       setShowCertModal(false);
+      showAlert(isRtl ? 'تم حفظ الشهادة في قاعدة البيانات بنجاح' : 'Certificate saved to database successfully', 'success');
       loadUser();
     } catch (err) {
-      showAlert(isRtl ? 'فشل إضافة الشهادة' : 'Failed to add certificate', 'error');
+      showAlert(isRtl ? 'فشل حفظ الشهادة' : 'Failed to save certificate', 'error');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDeleteCert = async (certToDelete: string) => {
+    if (!await showConfirm(isRtl ? 'حذف الشهادة' : 'Delete Certificate', isRtl ? 'هل أنت متأكد من حذف هذه الشهادة نهائياً؟' : 'Are you sure you want to delete this certificate?')) return;
     const currentCerts = user.engineerProfile?.certificates || user.contractorProfile?.certificates || [];
     const updatedCerts = currentCerts.filter((c: string) => c !== certToDelete);
     setSaving(true);
@@ -370,6 +449,7 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
         payload.contractorDetails = { ...user.contractorProfile, certificates: updatedCerts };
       }
       await api.patch(`/users/${id}`, payload);
+      showAlert(isRtl ? 'تم حذف الشهادة بنجاح' : 'Certificate deleted successfully', 'success');
       loadUser();
     } catch (err) {
       showAlert(isRtl ? 'فشل حذف الشهادة' : 'Failed to delete certificate', 'error');
@@ -391,7 +471,7 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
     setShowProjectModal(true);
   };
 
-  const handleSaveProject = (e: React.FormEvent) => {
+  const handleSaveProject = async (e: React.FormEvent) => {
     e.preventDefault();
     let updatedProjects: ProjectItem[] = [];
     if (editingProject) {
@@ -403,13 +483,47 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
     setProjects(updatedProjects);
     saveLocalData('projects', updatedProjects);
     setShowProjectModal(false);
+
+    setSaving(true);
+    try {
+      const payload: any = {};
+      if (user.role?.name === 'ENGINEER') {
+        payload.engineerDetails = { ...user.engineerProfile, customProjects: updatedProjects };
+      } else {
+        payload.contractorDetails = { ...user.contractorProfile, customProjects: updatedProjects };
+      }
+      await api.patch(`/users/${id}`, payload);
+      showAlert(isRtl ? 'تم حفظ المشروع في قاعدة البيانات بنجاح!' : 'Project saved to database successfully!', 'success');
+      loadUser();
+    } catch (err) {
+      showAlert(isRtl ? 'فشل حفظ المشروع في السيرفر' : 'Failed to save project on server', 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDeleteProject = async (projId: string) => {
-    if (!await showConfirm(isRtl ? 'هل أنت متأكد من حذف هذا المشروع؟' : 'Are you sure you want to delete this project?')) return;
+    if (!await showConfirm(isRtl ? 'حذف المشروع' : 'Delete Project', isRtl ? 'هل أنت متأكد من حذف هذا المشروع نهائياً؟' : 'Are you sure you want to delete this project?')) return;
     const updatedProjects = projects.filter(p => p.id !== projId);
     setProjects(updatedProjects);
     saveLocalData('projects', updatedProjects);
+
+    setSaving(true);
+    try {
+      const payload: any = {};
+      if (user.role?.name === 'ENGINEER') {
+        payload.engineerDetails = { ...user.engineerProfile, customProjects: updatedProjects };
+      } else {
+        payload.contractorDetails = { ...user.contractorProfile, customProjects: updatedProjects };
+      }
+      await api.patch(`/users/${id}`, payload);
+      showAlert(isRtl ? 'تم حذف المشروع بنجاح' : 'Project deleted successfully', 'success');
+      loadUser();
+    } catch (err) {
+      showAlert(isRtl ? 'فشل حذف المشروع من السيرفر' : 'Failed to delete project on server', 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   // ──────── TIMELINE CRUD ────────
@@ -425,7 +539,7 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
     setShowTimelineModal(true);
   };
 
-  const handleSaveTimeline = (e: React.FormEvent) => {
+  const handleSaveTimeline = async (e: React.FormEvent) => {
     e.preventDefault();
     let updatedTimeline: TimelineItem[] = [];
     if (editingTimeline) {
@@ -437,13 +551,47 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
     setTimeline(updatedTimeline);
     saveLocalData('timeline', updatedTimeline);
     setShowTimelineModal(false);
+
+    setSaving(true);
+    try {
+      const payload: any = {};
+      if (user.role?.name === 'ENGINEER') {
+        payload.engineerDetails = { ...user.engineerProfile, customExperiences: updatedTimeline };
+      } else {
+        payload.contractorDetails = { ...user.contractorProfile, customExperiences: updatedTimeline };
+      }
+      await api.patch(`/users/${id}`, payload);
+      showAlert(isRtl ? 'تم حفظ وتحديث الخبرة في قاعدة البيانات بنجاح' : 'Experience saved to database successfully', 'success');
+      loadUser();
+    } catch (err) {
+      showAlert(isRtl ? 'فشل حفظ الخبرة في السيرفر' : 'Failed to save experience on server', 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDeleteTimeline = async (itemId: string) => {
-    if (!await showConfirm(isRtl ? 'هل أنت متأكد من حذف هذه الخبرة؟' : 'Are you sure you want to delete this experience?')) return;
+    if (!await showConfirm(isRtl ? 'حذف الخبرة' : 'Delete Experience', isRtl ? 'هل أنت متأكد من حذف هذه الخبرة؟' : 'Are you sure you want to delete this experience?')) return;
     const updatedTimeline = timeline.filter(t => t.id !== itemId);
     setTimeline(updatedTimeline);
     saveLocalData('timeline', updatedTimeline);
+
+    setSaving(true);
+    try {
+      const payload: any = {};
+      if (user.role?.name === 'ENGINEER') {
+        payload.engineerDetails = { ...user.engineerProfile, customExperiences: updatedTimeline };
+      } else {
+        payload.contractorDetails = { ...user.contractorProfile, customExperiences: updatedTimeline };
+      }
+      await api.patch(`/users/${id}`, payload);
+      showAlert(isRtl ? 'تم حذف الخبرة بنجاح' : 'Experience deleted successfully', 'success');
+      loadUser();
+    } catch (err) {
+      showAlert(isRtl ? 'فشل حذف الخبرة من السيرفر' : 'Failed to delete experience on server', 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   // ──────── REVIEWS CRUD ────────
@@ -719,7 +867,27 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
             {activeTab === 'about' && (
               <div className="space-y-6">
                 <div>
-                  <h4 className="text-xs font-bold text-zinc-450 uppercase tracking-wider mb-2">{isRtl ? 'النبذة المهنية' : 'Professional Bio'}</h4>
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="text-xs font-bold text-zinc-450 uppercase tracking-wider">{isRtl ? 'النبذة المهنية' : 'Professional Bio'}</h4>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        type="button"
+                        onClick={handleOpenEditBio}
+                        className="px-3 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 text-xs font-bold transition flex items-center gap-1 cursor-pointer border border-amber-500/20"
+                      >
+                        ✏️ {isRtl ? 'تعديل النبذة' : 'Edit Bio'}
+                      </button>
+                      {profile?.bio && (
+                        <button 
+                          type="button"
+                          onClick={handleDeleteBio}
+                          className="px-3 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-bold transition flex items-center gap-1 cursor-pointer border border-red-500/20"
+                        >
+                          🗑️ {isRtl ? 'حذف النبذة' : 'Delete Bio'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
                   <p className={`text-sm leading-relaxed ${isDark ? 'text-zinc-300' : 'text-zinc-700'} font-medium`}>
                     {profile?.bio || (isRtl ? 'لا يوجد نبذة مهنية مكتوبة حالياً.' : 'No biography declared yet.')}
                   </p>
@@ -829,7 +997,7 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
                 <div className="flex justify-between items-center mb-2">
                   <h4 className="text-xs font-bold text-zinc-450 uppercase tracking-wider">{isRtl ? 'إدارة الشهادات المهنية (مع صور المعاينة)' : 'Professional Certifications with Images'}</h4>
                   <button 
-                    onClick={() => { setCertForm({ title: '', image: '' }); setShowCertModal(true); }}
+                    onClick={handleOpenAddCert}
                     className="px-3.5 py-1.5 rounded-lg primary-gradient text-zinc-950 text-xs font-bold hover:opacity-90 transition shadow-md cursor-pointer"
                   >
                     + {isRtl ? 'إضافة شهادة وصورة' : 'Add Certificate'}
@@ -871,14 +1039,25 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
                           </div>
                         )}
 
-                        {/* Delete button */}
-                        <button 
-                          onClick={() => handleDeleteCert(certStr)} 
-                          className="absolute left-2.5 bottom-2.5 opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-red-400 text-sm transition cursor-pointer"
-                          title={isRtl ? 'حذف الشهادة' : 'Delete Certificate'}
-                        >
-                          🗑️
-                        </button>
+                        {/* Actions (Edit & Delete) */}
+                        <div className="absolute left-2.5 bottom-2.5 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition">
+                          <button 
+                            type="button"
+                            onClick={() => handleOpenEditCert(certStr, index)} 
+                            className="p-1 rounded-md bg-zinc-800/90 hover:bg-zinc-700 text-amber-400 text-xs border border-zinc-700 transition cursor-pointer"
+                            title={isRtl ? 'تعديل الشهادة' : 'Edit Certificate'}
+                          >
+                            ✏️
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => handleDeleteCert(certStr)} 
+                            className="p-1 rounded-md bg-zinc-800/90 hover:bg-zinc-700 text-red-400 text-xs border border-zinc-700 transition cursor-pointer"
+                            title={isRtl ? 'حذف الشهادة' : 'Delete Certificate'}
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </div>
                     );
                   })}
@@ -1115,13 +1294,15 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
         </div>
       )}
 
-      {/* MODAL 4: ADD CERTIFICATION WITH IMAGE URL */}
+      {/* MODAL 4: ADD/EDIT CERTIFICATION WITH IMAGE URL */}
       {showCertModal && (
         <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className={`w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden ${isRtl ? 'text-right' : 'text-left'} ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'}`}>
             <div className={`px-6 py-4 border-b flex items-center justify-between shrink-0 ${isDark ? 'bg-zinc-900/80 border-zinc-800' : 'bg-zinc-50 border-zinc-200'}`}>
               <h3 className={`font-extrabold text-sm ${isDark ? 'text-zinc-100' : 'text-zinc-850'}`}>
-                {isRtl ? 'إضافة شهادة مهنية جديدة' : 'Add New Certificate'}
+                {editingCertIndex !== null 
+                  ? (isRtl ? 'تعديل الشهادة المهنية' : 'Edit Professional Certificate') 
+                  : (isRtl ? 'إضافة شهادة مهنية جديدة' : 'Add New Certificate')}
               </h3>
               <button onClick={() => setShowCertModal(false)} className={`w-7 h-7 rounded-full flex items-center justify-center text-xs cursor-pointer transition ${isDark ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-500'}`}>✕</button>
             </div>
@@ -1140,8 +1321,47 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
                 <button type="button" onClick={() => setShowCertModal(false)} className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${isDark ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-750' : 'bg-zinc-200 text-zinc-700 hover:bg-zinc-300'}`}>
                   {isRtl ? 'إلغاء' : 'Cancel'}
                 </button>
-                <button type="submit" disabled={saving} className="px-5 py-2 rounded-xl primary-gradient text-zinc-950 font-bold text-xs hover:opacity-90 transition cursor-pointer">
-                  {isRtl ? 'إضافة الشهادة' : 'Add Certificate'}
+                <button type="submit" disabled={saving} className="px-5 py-2 rounded-xl primary-gradient text-zinc-950 font-bold text-xs hover:opacity-90 transition cursor-pointer flex items-center gap-1.5">
+                  {saving && <span className="w-3.5 h-3.5 border-2 border-zinc-950/30 border-t-zinc-950 rounded-full animate-spin" />}
+                  {editingCertIndex !== null ? (isRtl ? 'حفظ التعديل' : 'Save Changes') : (isRtl ? 'إضافة الشهادة' : 'Add Certificate')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: DIRECT EDIT BIO */}
+      {showBioModal && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className={`w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden ${isRtl ? 'text-right' : 'text-left'} ${isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'}`}>
+            <div className={`px-6 py-4 border-b flex items-center justify-between shrink-0 ${isDark ? 'bg-zinc-900/80 border-zinc-800' : 'bg-zinc-50 border-zinc-200'}`}>
+              <h3 className={`font-extrabold text-sm ${isDark ? 'text-zinc-100' : 'text-zinc-850'}`}>
+                {isRtl ? 'تعديل النبذة المهنية' : 'Edit Professional Bio'}
+              </h3>
+              <button onClick={() => setShowBioModal(false)} className={`w-7 h-7 rounded-full flex items-center justify-center text-xs cursor-pointer transition ${isDark ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-500'}`}>✕</button>
+            </div>
+
+            <form onSubmit={handleSaveBio} className="p-6 space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-500 uppercase mb-1.5">{isRtl ? 'نص النبذة المهنية' : 'Bio Content'}</label>
+                <textarea 
+                  rows={6} 
+                  required 
+                  value={bioInput} 
+                  onChange={e => setBioInput(e.target.value)} 
+                  placeholder={isRtl ? 'اكتب نبذة مهنية توضح الخبرات والمسار الهندسي والمهني...' : 'Write your professional bio...'}
+                  className={inputCls} 
+                />
+              </div>
+
+              <div className={`flex justify-end gap-3 -mx-6 -mb-6 px-6 py-4 border-t ${isDark ? 'border-zinc-800 bg-zinc-900/50' : 'border-zinc-200 bg-zinc-50'}`}>
+                <button type="button" onClick={() => setShowBioModal(false)} className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${isDark ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' : 'bg-zinc-200 text-zinc-700 hover:bg-zinc-300'}`}>
+                  {isRtl ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button type="submit" disabled={saving} className="px-5 py-2 rounded-xl primary-gradient text-zinc-950 font-bold text-xs hover:opacity-90 transition cursor-pointer flex items-center gap-1.5">
+                  {saving && <span className="w-3.5 h-3.5 border-2 border-zinc-950/30 border-t-zinc-950 rounded-full animate-spin" />}
+                  {isRtl ? 'حفظ النبذة في السيرفر' : 'Save Bio to Server'}
                 </button>
               </div>
             </form>

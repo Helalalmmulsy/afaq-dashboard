@@ -88,6 +88,61 @@ export default function UsersPage() {
     } finally { setSaving(false); }
   };
 
+  const handleToggleStatus = async (targetUser: any) => {
+    const isSuspended = targetUser.status === 'SUSPENDED';
+    const actionText = isSuspended
+      ? (isRtl ? `تنشيط حساب "${targetUser.name}"؟` : `activate account of "${targetUser.name}"?`)
+      : (isRtl ? `إيقاف وتجميد حساب "${targetUser.name}"؟ سيتم منع المستخدم من تسجيل الدخول واستخدام التطبيق.` : `suspend account of "${targetUser.name}"? The user will be blocked from logging in.`);
+
+    const confirmed = await showConfirm(
+      isRtl ? (isSuspended ? 'تنشيط الحساب' : 'إيقاف الحساب') : (isSuspended ? 'Activate Account' : 'Suspend Account'),
+      actionText
+    );
+    if (!confirmed) return;
+
+    setSaving(true);
+    try {
+      const endpoint = isSuspended ? `/users/${targetUser.id}/activate` : `/users/${targetUser.id}/suspend`;
+      await api.patch(endpoint, {});
+      showAlert(
+        isRtl
+          ? (isSuspended ? 'تم تنشيط الحساب بنجاح' : 'تم إيقاف الحساب بنجاح')
+          : (isSuspended ? 'Account activated successfully' : 'Account suspended successfully'),
+        'success'
+      );
+      loadData();
+      if (selected?.id === targetUser.id) {
+        setSelected((prev: any) => ({ ...prev, status: isSuspended ? 'ACTIVE' : 'SUSPENDED' }));
+      }
+    } catch (err: any) {
+      showAlert(err?.message || (isRtl ? 'فشلت العملية' : 'Operation failed'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteUser = async (targetUser: any) => {
+    const confirmed = await showConfirm(
+      isRtl ? 'حذف المستخدم نهائياً' : 'Delete User Permanently',
+      isRtl
+        ? `تحذير: هل أنت متأكد من حذف المستخدم "${targetUser.name}"؟ سيتم حذف حسابه وكافة الملفات والبيانات التابعة له نهائياً من قاعدة البيانات ولا يمكن التراجع.`
+        : `Warning: Are you sure you want to permanently delete "${targetUser.name}"? All associated data will be removed.`
+    );
+    if (!confirmed) return;
+
+    setSaving(true);
+    try {
+      await api.delete(`/users/${targetUser.id}`);
+      showAlert(isRtl ? 'تم حذف المستخدم نهائياً بنجاح' : 'User deleted permanently', 'success');
+      if (selected?.id === targetUser.id) setSelected(null);
+      loadData();
+    } catch (err: any) {
+      showAlert(err?.message || (isRtl ? 'فشل حذف المستخدم' : 'Failed to delete user'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // Count per role
   const roleCounts: Record<string, number> = {};
   users.forEach(u => { const rn = u.role?.name || 'OTHER'; roleCounts[rn] = (roleCounts[rn] || 0) + 1; });
@@ -203,6 +258,7 @@ export default function UsersPage() {
                 <th className="px-5 py-3">{isRtl ? 'المستخدم' : 'User'}</th>
                 <th className="px-5 py-3 hidden md:table-cell">{isRtl ? 'التواصل' : 'Contact'}</th>
                 <th className="px-5 py-3">{isRtl ? 'الدور' : 'Role'}</th>
+                <th className="px-5 py-3">{isRtl ? 'الحالة' : 'Status'}</th>
                 <th className="px-5 py-3 hidden lg:table-cell">{isRtl ? 'الملف المهني' : 'Profile'}</th>
                 <th className="px-5 py-3 hidden lg:table-cell">{isRtl ? 'تاريخ الانضمام' : 'Joined'}</th>
               </tr>
@@ -210,6 +266,7 @@ export default function UsersPage() {
             <tbody className={`divide-y ${theme === 'dark' ? 'divide-zinc-800/60' : 'divide-zinc-100'}`}>
               {filtered.map(user => {
                 const isActive = selected?.id === user.id;
+                const isSuspended = user.status === 'SUSPENDED';
                 const rm = ROLE_META[user.role?.name];
                 return (
                   <tr key={user.id} onClick={() => setSelected(isActive ? null : user)}
@@ -233,6 +290,19 @@ export default function UsersPage() {
                     <td className="px-5 py-3.5">
                       <RoleBadge roleName={user.role?.name} roleNameAr={user.role?.nameAr} lang={lang} />
                     </td>
+                    <td className="px-5 py-3.5">
+                      {isSuspended ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/60">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                          {isRtl ? 'موقوف' : 'Suspended'}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          {isRtl ? 'نشط' : 'Active'}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-5 py-3.5 hidden lg:table-cell">
                       {user.role?.name === 'ENGINEER' && user.engineerProfile ? (
                         <div>
@@ -255,7 +325,7 @@ export default function UsersPage() {
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={5} className={`py-14 text-center text-sm italic ${theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>
+                <tr><td colSpan={6} className={`py-14 text-center text-sm italic ${theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>
                   {isRtl ? 'لا يوجد مستخدمون مطابقون.' : 'No users match the current filter.'}
                 </td></tr>
               )}
@@ -348,6 +418,50 @@ export default function UsersPage() {
               <div className={`p-3 rounded-xl border ${theme === 'dark' ? 'bg-zinc-800/40 border-zinc-700/60' : 'bg-zinc-50 border-zinc-200'}`}>
                 <span className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">{isRtl ? 'تاريخ الانضمام' : 'Joined'}</span>
                 <span className={`text-xs font-mono ${theme === 'dark' ? 'text-zinc-400' : 'text-zinc-500'}`}>{new Date(selected.createdAt).toLocaleString()}</span>
+              </div>
+
+              {/* Status and Actions Card */}
+              <div className={`p-3.5 rounded-xl border space-y-3 ${theme === 'dark' ? 'bg-zinc-800/50 border-zinc-700/70' : 'bg-zinc-100/70 border-zinc-200'}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase">{isRtl ? 'حالة الحساب' : 'Account Status'}</span>
+                  {selected.status === 'SUSPENDED' ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-red-500/10 text-red-500 border border-red-500/20 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                      {isRtl ? 'موقوف مؤقتاً' : 'Suspended'}
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      {isRtl ? 'نشط ويعمل' : 'Active'}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-1 border-t border-zinc-200 dark:border-zinc-700/60">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleToggleStatus(selected); }}
+                    disabled={saving}
+                    className={`py-2 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 border cursor-pointer ${
+                      selected.status === 'SUSPENDED'
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800 hover:bg-emerald-100'
+                        : 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800 hover:bg-amber-100'
+                    }`}
+                  >
+                    {selected.status === 'SUSPENDED' ? (
+                      <><span>▶️</span> {isRtl ? 'تنشيط' : 'Activate'}</>
+                    ) : (
+                      <><span>⏸️</span> {isRtl ? 'إيقاف' : 'Suspend'}</>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDeleteUser(selected); }}
+                    disabled={saving}
+                    className="py-2 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 border border-red-300 dark:border-red-900/60 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/60 cursor-pointer"
+                  >
+                    <span>🗑️</span> {isRtl ? 'حذف' : 'Delete'}
+                  </button>
+                </div>
               </div>
             </div>
 
