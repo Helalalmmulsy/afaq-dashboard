@@ -17,9 +17,10 @@ const SETTING_META: Record<string, {
   platform_email:   { labelAr: 'البريد الرسمي',             labelEn: 'Official Email',        group: 'contact',  icon: '✉️', type: 'email',    placeholder: 'contact@example.com' },
   platform_phone:   { labelAr: 'رقم الهاتف',                labelEn: 'Phone Number',          group: 'contact',  icon: '📞', type: 'text',     placeholder: '+967 XXX XXXXXX' },
   platform_address: { labelAr: 'العنوان الفعلي',             labelEn: 'Physical Address',      group: 'contact',  icon: '📍', type: 'text',     placeholder: 'ذمار، اليمن' },
-  ai_api_key:       { labelAr: 'مفتاح Gemini API',          labelEn: 'Gemini API Key',        group: 'ai',       icon: '🔑', type: 'password', placeholder: 'AIza...', sensitive: true },
-  ai_model:         { labelAr: 'نموذج الذكاء الاصطناعي',    labelEn: 'AI Model Version',      group: 'ai',       icon: '🤖', type: 'text',     placeholder: 'gemini-2.0-flash' },
-  ai_monthly_limit: { labelAr: 'حد الرسائل الشهري',         labelEn: 'Monthly Message Limit', group: 'ai',       icon: '📊', type: 'number',   placeholder: '100' },
+  ai_enabled:       { labelAr: 'تفعيل المساعد الذكي',       labelEn: 'Enable AI Assistant',   group: 'ai',       icon: '⚡', type: 'text',     placeholder: 'true' },
+  ai_api_key:       { labelAr: 'مفتاح Gemini API',          labelEn: 'Gemini API Key',        group: 'ai',       icon: '🔑', type: 'password', placeholder: 'AQ.Ab8RN...', sensitive: true },
+  ai_model:         { labelAr: 'نموذج الذكاء الاصطناعي',    labelEn: 'AI Model Version',      group: 'ai',       icon: '🤖', type: 'text',     placeholder: 'gemini-3.8-flash' },
+  ai_monthly_limit: { labelAr: 'حد الرسائل الشهري',         labelEn: 'Monthly Message Limit', group: 'ai',       icon: '📊', type: 'number',   placeholder: '1000' },
 };
 
 const GROUP_META = {
