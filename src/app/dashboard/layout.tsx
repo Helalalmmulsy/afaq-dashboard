@@ -25,6 +25,7 @@ const MENU_ITEMS = [
   
   // Users & Admin Settings
   { path: '/dashboard/users', labelKey: 'users', icon: '👥' },
+  { path: '/dashboard/taxonomies', labelKey: 'taxonomies', icon: '📑' },
   { path: '/dashboard/settings', labelKey: 'settings', icon: '🔧' },
   { path: '/dashboard/logs', labelKey: 'logs', icon: '📜' },
 ];
