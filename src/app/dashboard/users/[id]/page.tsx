@@ -162,7 +162,9 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
         ? profileObj.customExperiences
         : (localTimeline ? JSON.parse(localTimeline) : defaultTimeline);
 
-      const loadedReviews = localReviews ? JSON.parse(localReviews) : defaultReviews;
+      const loadedReviews = (profileObj.customReviews && Array.isArray(profileObj.customReviews) && profileObj.customReviews.length > 0)
+        ? profileObj.customReviews
+        : (localReviews ? JSON.parse(localReviews) : defaultReviews);
       const loadedCity = localCity || (isRtl ? 'محافظة ذمار' : 'Dhamar Governorate');
       const loadedRoleTitle = localRoleTitle || (res.role?.name === 'ENGINEER' ? (isRtl ? 'مهندس معماري رئيسي' : 'Chief Architect') : (isRtl ? 'مؤسسة مقاولات عامة' : 'General Contracting'));
 
@@ -255,6 +257,9 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
           skills: user.engineerProfile?.skills || [],
           certificates: user.engineerProfile?.certificates || [],
           qualifications: user.engineerProfile?.qualifications || [],
+          customProjects: user.engineerProfile?.customProjects || projects,
+          customExperiences: user.engineerProfile?.customExperiences || timeline,
+          customReviews: user.engineerProfile?.customReviews || reviews,
         };
       } else if (user.role?.name === 'CONTRACTOR') {
         payload.contractorDetails = {
@@ -263,6 +268,9 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
           bio: basicForm.bio,
           skills: user.contractorProfile?.skills || [],
           certificates: user.contractorProfile?.certificates || [],
+          customProjects: user.contractorProfile?.customProjects || projects,
+          customExperiences: user.contractorProfile?.customExperiences || timeline,
+          customReviews: user.contractorProfile?.customReviews || reviews,
         };
       }
 
@@ -600,7 +608,7 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
     setShowReviewModal(true);
   };
 
-  const handleSaveReview = (e: React.FormEvent) => {
+  const handleSaveReview = async (e: React.FormEvent) => {
     e.preventDefault();
     const newReview: ReviewItem = {
       id: 'r_' + Date.now(),
@@ -615,6 +623,23 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
     setReviews(updatedReviews);
     saveLocalData('reviews', updatedReviews);
     setShowReviewModal(false);
+
+    setSaving(true);
+    try {
+      const payload: any = {};
+      if (user.role?.name === 'ENGINEER') {
+        payload.engineerDetails = { ...user.engineerProfile, customReviews: updatedReviews };
+      } else {
+        payload.contractorDetails = { ...user.contractorProfile, customReviews: updatedReviews };
+      }
+      await api.patch(`/users/${id}`, payload);
+      showAlert(isRtl ? 'تم حفظ التقييم في قاعدة البيانات بنجاح' : 'Review saved to database successfully', 'success');
+      loadUser();
+    } catch (err) {
+      showAlert(isRtl ? 'فشل حفظ التقييم في السيرفر' : 'Failed to save review to server', 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDeleteReview = async (revId: string) => {
@@ -622,6 +647,23 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
     const updatedReviews = reviews.filter(r => r.id !== revId);
     setReviews(updatedReviews);
     saveLocalData('reviews', updatedReviews);
+
+    setSaving(true);
+    try {
+      const payload: any = {};
+      if (user.role?.name === 'ENGINEER') {
+        payload.engineerDetails = { ...user.engineerProfile, customReviews: updatedReviews };
+      } else {
+        payload.contractorDetails = { ...user.contractorProfile, customReviews: updatedReviews };
+      }
+      await api.patch(`/users/${id}`, payload);
+      showAlert(isRtl ? 'تم حذف التقييم بنجاح' : 'Review deleted successfully', 'success');
+      loadUser();
+    } catch (err) {
+      showAlert(isRtl ? 'فشل حذف التقييم من السيرفر' : 'Failed to delete review on server', 'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   useEffect(() => {

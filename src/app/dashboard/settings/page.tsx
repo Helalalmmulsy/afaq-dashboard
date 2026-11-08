@@ -7,14 +7,19 @@ import { useApp } from '../../../context/AppContext';
 // Metadata for each setting key
 const SETTING_META: Record<string, {
   labelAr: string; labelEn: string;
-  group: 'platform' | 'location' | 'social' | 'contact' | 'ai';
+  group: 'platform' | 'about' | 'location' | 'social' | 'contact' | 'ai';
   icon: string;
-  type: 'text' | 'email' | 'password' | 'number' | 'url';
+  type: 'text' | 'email' | 'password' | 'number' | 'url' | 'textarea';
   placeholder?: string;
   sensitive?: boolean;
 }> = {
   platform_name:    { labelAr: 'اسم المنصة / المكتب',         labelEn: 'Platform / Office Name',group: 'platform', icon: '🏢', type: 'text',     placeholder: 'آفاق العرب الذكية' },
   platform_logo:    { labelAr: 'شعار المكتب (Logo)',          labelEn: 'Office Logo',           group: 'platform', icon: '🎨', type: 'url',      placeholder: 'https://... أو رفع صورة' },
+
+  about_us:         { labelAr: 'نبذة عن المكتب (من نحن)',     labelEn: 'About the Office',      group: 'about',    icon: '📝', type: 'textarea', placeholder: 'نبذة تعريفية شاملة عن مكتب آفاق العرب...' },
+  company_vision:   { labelAr: 'رؤية المكتب',                 labelEn: 'Company Vision',        group: 'about',    icon: '🎯', type: 'textarea', placeholder: 'الريادة والتميز في تقديم أرقى الخدمات...' },
+  company_mission:  { labelAr: 'رسالة المكتب وقيمه',          labelEn: 'Company Mission',       group: 'about',    icon: '🚀', type: 'textarea', placeholder: 'تقديم تصاميم وإشراف وتنفيذ هندسي دقيق...' },
+  company_team_info:{ labelAr: 'معلومات فريق العمل والتطوير', labelEn: 'Team & Development Info',group: 'about',    icon: '👥', type: 'textarea', placeholder: 'فريق استشاري وتقني متكامل...' },
   
   platform_address: { labelAr: 'العنوان الفعلي للمكتب',        labelEn: 'Physical Office Address',group: 'location', icon: '📍', type: 'text',     placeholder: 'محافظة ذمار، اليمن' },
   office_latitude:  { labelAr: 'دائرة العرض (Latitude)',       labelEn: 'Latitude',              group: 'location', icon: '🌐', type: 'text',     placeholder: '14.559980' },
@@ -39,7 +44,8 @@ const SETTING_META: Record<string, {
 
 const GROUP_META = {
   platform: { labelAr: 'هوية المنصة والشعار',   labelEn: 'Platform & Branding',  icon: '🏢', color: 'text-blue-600 dark:text-blue-400',       bg: 'bg-blue-50 dark:bg-blue-500/10',       border: 'border-blue-200 dark:border-blue-500/20',       bar: 'bg-blue-500' },
-  location: { labelAr: 'موقع المكتب والخريطة',  labelEn: 'Office Location & Maps',icon: '📍', color: 'text-amber-600 dark:text-amber-400',   bg: 'bg-amber-50 dark:bg-amber-500/10',     border: 'border-amber-200 dark:border-amber-500/20',     bar: 'bg-amber-500' },
+  about:    { labelAr: 'نبذة عنا وفريق العمل',  labelEn: 'About Us & Team',      icon: '🏛️', color: 'text-amber-600 dark:text-amber-400',     bg: 'bg-amber-50 dark:bg-amber-500/10',     border: 'border-amber-200 dark:border-amber-500/20',     bar: 'bg-amber-500' },
+  location: { labelAr: 'موقع المكتب والخريطة',  labelEn: 'Office Location & Maps',icon: '📍', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-500/20', bar: 'bg-emerald-500' },
   social:   { labelAr: 'منصات التواصل الاجتماعي',labelEn: 'Social Media Channels',icon: '🌐', color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-500/10',   border: 'border-indigo-200 dark:border-indigo-500/20',   bar: 'bg-indigo-500' },
   contact:  { labelAr: 'بيانات التواصل الأساسية',labelEn: 'Contact Details',     icon: '📞', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-500/20', bar: 'bg-emerald-500' },
   ai:       { labelAr: 'إعدادات الذكاء الاصطناعي',labelEn: 'AI Configuration',   icon: '🤖', color: 'text-purple-600 dark:text-purple-400',   bg: 'bg-purple-50 dark:bg-purple-500/10',   border: 'border-purple-200 dark:border-purple-500/20',   bar: 'bg-purple-500' },
@@ -234,6 +240,7 @@ export default function SettingsPage() {
   // Group settings by category
   const grouped: Record<keyof typeof GROUP_META, any[]> = {
     platform: [],
+    about: [],
     location: [],
     social: [],
     contact: [],
@@ -425,16 +432,28 @@ export default function SettingsPage() {
                           )}
                         </div>
                         <div className="relative">
-                          <input
-                            id={`setting-${setting.key}`}
-                            type={isSensitive && !showKey ? 'password' : (meta?.type === 'password' ? 'text' : meta?.type ?? 'text')}
-                            value={form[setting.key] || ''}
-                            onChange={e => setForm({ ...form, [setting.key]: e.target.value })}
-                            placeholder={meta?.placeholder}
-                            className={`${inputCls} ${isSensitive ? (isRtl ? 'pe-10' : 'pr-10') : ''}`}
-                            dir={['email', 'url', 'password'].includes(meta?.type ?? '') || setting.key.includes('api') || setting.key.includes('model') || setting.key.includes('phone') || setting.key.includes('latitude') || setting.key.includes('longitude') ? 'ltr' : undefined}
-                            aria-label={isRtl ? meta?.labelAr : meta?.labelEn}
-                          />
+                          {meta?.type === 'textarea' ? (
+                            <textarea
+                              id={`setting-${setting.key}`}
+                              rows={3}
+                              value={form[setting.key] || ''}
+                              onChange={e => setForm({ ...form, [setting.key]: e.target.value })}
+                              placeholder={meta?.placeholder}
+                              className={`${inputCls} resize-y min-h-[80px]`}
+                              aria-label={isRtl ? meta?.labelAr : meta?.labelEn}
+                            />
+                          ) : (
+                            <input
+                              id={`setting-${setting.key}`}
+                              type={isSensitive && !showKey ? 'password' : (meta?.type === 'password' ? 'text' : meta?.type ?? 'text')}
+                              value={form[setting.key] || ''}
+                              onChange={e => setForm({ ...form, [setting.key]: e.target.value })}
+                              placeholder={meta?.placeholder}
+                              className={`${inputCls} ${isSensitive ? (isRtl ? 'pe-10' : 'pr-10') : ''}`}
+                              dir={['email', 'url', 'password'].includes(meta?.type ?? '') || setting.key.includes('api') || setting.key.includes('model') || setting.key.includes('phone') || setting.key.includes('latitude') || setting.key.includes('longitude') ? 'ltr' : undefined}
+                              aria-label={isRtl ? meta?.labelAr : meta?.labelEn}
+                            />
+                          )}
                           {isSensitive && (
                             <button
                               type="button"
