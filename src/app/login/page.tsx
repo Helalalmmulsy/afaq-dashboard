@@ -12,7 +12,7 @@ const FEATURES = [
 ];
 
 export default function LoginPage() {
-  const { theme, lang } = useApp();
+  const { theme, lang, platformLogo, platformName } = useApp();
   const isRtl  = lang === 'ar';
   const isDark = theme === 'dark';
 
@@ -86,11 +86,19 @@ export default function LoginPage() {
 
         {/* Top logo */}
         <div className="relative z-10 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl primary-gradient flex items-center justify-center text-zinc-950 font-black text-sm shadow-lg shadow-primary/20">
-            {isRtl ? 'آفاق' : 'A'}
-          </div>
+          {platformLogo ? (
+            <img
+              src={platformLogo}
+              alt="Logo"
+              className="w-10 h-10 rounded-xl object-contain bg-zinc-900 border border-zinc-700/50 shadow-lg shadow-primary/20"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-xl primary-gradient flex items-center justify-center text-zinc-950 font-black text-sm shadow-lg shadow-primary/20">
+              {isRtl ? 'آفاق' : 'A'}
+            </div>
+          )}
           <span className={`text-lg font-extrabold tracking-tight ${logoText}`}>
-            {isRtl ? 'آفاق العرب الذكية' : 'Smart Arab Horizons'}
+            {platformName || (isRtl ? 'آفاق العرب الذكية' : 'Smart Arab Horizons')}
           </span>
         </div>
 
@@ -140,10 +148,20 @@ export default function LoginPage() {
 
         {/* Mobile logo */}
         <div className="lg:hidden flex items-center gap-3 mb-10">
-          <div className="w-10 h-10 rounded-xl primary-gradient flex items-center justify-center text-zinc-950 font-black text-sm shadow-lg">
-            {isRtl ? 'آفاق' : 'A'}
-          </div>
-          <span className={`text-lg font-extrabold ${logoText}`}>{isRtl ? 'آفاق العرب الذكية' : 'Smart Arab Horizons'}</span>
+          {platformLogo ? (
+            <img
+              src={platformLogo}
+              alt="Logo"
+              className="w-10 h-10 rounded-xl object-contain bg-zinc-900 border border-zinc-700/50 shadow-lg"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-xl primary-gradient flex items-center justify-center text-zinc-950 font-black text-sm shadow-lg">
+              {isRtl ? 'آفاق' : 'A'}
+            </div>
+          )}
+          <span className={`text-lg font-extrabold ${logoText}`}>
+            {platformName || (isRtl ? 'آفاق العرب الذكية' : 'Smart Arab Horizons')}
+          </span>
         </div>
 
         {/* Card */}

@@ -33,7 +33,7 @@ const MENU_ITEMS = [
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { lang, theme, themeColor, toggleLang, toggleTheme, setThemeColor, t } = useApp();
+  const { lang, theme, themeColor, toggleLang, toggleTheme, setThemeColor, t, platformLogo, platformName } = useApp();
 
   const handleLogout = () => {
     clearCookie('token');
@@ -49,10 +49,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <aside className={`hidden md:flex flex-col w-64 h-full ${theme === 'dark' ? 'bg-[#18181b] border-zinc-800' : 'bg-white border-zinc-200'} ${lang === 'ar' ? 'border-l' : 'border-r'} shrink-0`}>
         <div className={`h-16 flex items-center justify-between px-6 border-b ${theme === 'dark' ? 'border-zinc-800' : 'border-zinc-200'}`}>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg primary-gradient flex items-center justify-center text-zinc-950 font-bold text-sm">
-              آفاق
-            </div>
-            <span className={`font-bold text-base ${theme === 'dark' ? 'text-zinc-100' : 'text-zinc-800'}`}>آفاق العرب</span>
+            {platformLogo ? (
+              <img
+                src={platformLogo}
+                alt="Logo"
+                className="w-8 h-8 rounded-lg object-contain bg-zinc-900 border border-zinc-700/50 shadow-sm"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-lg primary-gradient flex items-center justify-center text-zinc-950 font-bold text-sm">
+                آفاق
+              </div>
+            )}
+            <span className={`font-bold text-base truncate max-w-[140px] ${theme === 'dark' ? 'text-zinc-100' : 'text-zinc-800'}`}>
+              {platformName || 'آفاق العرب'}
+            </span>
           </div>
         </div>
 
@@ -109,10 +119,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       >
         <div className={`h-16 flex items-center justify-between px-6 border-b ${theme === 'dark' ? 'border-zinc-800' : 'border-zinc-200'}`}>
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg primary-gradient flex items-center justify-center text-zinc-950 font-bold text-sm">
-              آفاق
-            </div>
-            <span className={`font-bold text-base ${theme === 'dark' ? 'text-zinc-100' : 'text-zinc-800'}`}>آفاق العرب</span>
+            {platformLogo ? (
+              <img
+                src={platformLogo}
+                alt="Logo"
+                className="w-8 h-8 rounded-lg object-contain bg-zinc-900 border border-zinc-700/50 shadow-sm"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-lg primary-gradient flex items-center justify-center text-zinc-950 font-bold text-sm">
+                آفاق
+              </div>
+            )}
+            <span className={`font-bold text-base truncate max-w-[140px] ${theme === 'dark' ? 'text-zinc-100' : 'text-zinc-800'}`}>
+              {platformName || 'آفاق العرب'}
+            </span>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="text-zinc-400 text-lg">
             ✕

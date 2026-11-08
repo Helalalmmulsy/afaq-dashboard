@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { api } from '../lib/api';
 
 type Theme = 'dark' | 'light';
 type Lang = 'ar' | 'en';
@@ -10,6 +11,9 @@ interface AppContextType {
   theme: Theme;
   lang: Lang;
   themeColor: ThemeColor;
+  platformLogo: string | null;
+  platformName: string;
+  refreshSettings: () => Promise<void>;
   toggleTheme: () => void;
   toggleLang: () => void;
   setThemeColor: (color: ThemeColor) => void;
@@ -133,6 +137,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [lang, setLang] = useState<Lang>('ar');
   const [themeColor, setThemeColorState] = useState<ThemeColor>('gold');
   const [mounted, setMounted] = useState(false);
+  const [platformLogo, setPlatformLogo] = useState<string | null>(null);
+  const [platformName, setPlatformName] = useState<string>('آفاق العرب');
+
+  const refreshSettings = async () => {
+    try {
+      const res = await api.get('/settings/public');
+      if (res) {
+        if (res.platform_logo) {
+          setPlatformLogo(res.platform_logo);
+        } else if (res.settings && Array.isArray(res.settings)) {
+          const s = res.settings.find((item: any) => item.key === 'platform_logo');
+          if (s?.value) setPlatformLogo(s.value);
+        }
+        if (res.platform_name) {
+          setPlatformName(res.platform_name);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  };
 
   // Global Dialog States
   const [alertDialog, setAlertDialog] = useState<{
@@ -178,6 +203,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     
     setMounted(true);
+    refreshSettings();
   }, []);
 
   const applyThemeColor = (color: ThemeColor) => {
@@ -272,7 +298,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isDark = theme === 'dark';
 
   return (
-    <AppContext.Provider value={{ theme, lang, themeColor, toggleTheme, toggleLang, setThemeColor, t, showAlert, showConfirm }}>
+    <AppContext.Provider value={{ theme, lang, themeColor, platformLogo, platformName, refreshSettings, toggleTheme, toggleLang, setThemeColor, t, showAlert, showConfirm }}>
       {children}
 
       {/* ── Custom Global Alert Modal ── */}
