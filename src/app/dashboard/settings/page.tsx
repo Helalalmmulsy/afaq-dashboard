@@ -17,8 +17,8 @@ const SETTING_META: Record<string, {
   platform_logo:    { labelAr: 'شعار المكتب (Logo)',          labelEn: 'Office Logo',           group: 'platform', icon: '🎨', type: 'url',      placeholder: 'https://... أو رفع صورة' },
   
   platform_address: { labelAr: 'العنوان الفعلي للمكتب',        labelEn: 'Physical Office Address',group: 'location', icon: '📍', type: 'text',     placeholder: 'محافظة ذمار، اليمن' },
-  office_latitude:  { labelAr: 'دائرة العرض (Latitude)',       labelEn: 'Latitude',              group: 'location', icon: '🌐', type: 'text',     placeholder: '14.5425' },
-  office_longitude: { labelAr: 'خط الطول (Longitude)',        labelEn: 'Longitude',             group: 'location', icon: '🌐', type: 'text',     placeholder: '44.4011' },
+  office_latitude:  { labelAr: 'دائرة العرض (Latitude)',       labelEn: 'Latitude',              group: 'location', icon: '🌐', type: 'text',     placeholder: '14.559980' },
+  office_longitude: { labelAr: 'خط الطول (Longitude)',        labelEn: 'Longitude',             group: 'location', icon: '🌐', type: 'text',     placeholder: '44.385939' },
 
   facebook_url:     { labelAr: 'رابط صفحة فيسبوك الرسمية',    labelEn: 'Official Facebook Page',group: 'social',   icon: '📘', type: 'url',      placeholder: 'https://www.facebook.com/...' },
   instagram_url:    { labelAr: 'رابط حساب انستغرام',          labelEn: 'Instagram Profile URL', group: 'social',   icon: '📷', type: 'url',      placeholder: 'https://www.instagram.com/...' },
@@ -46,7 +46,7 @@ const GROUP_META = {
 };
 
 const CITY_PRESETS = [
-  { nameAr: 'ذمار (مقر المكتب الرئيسي)', nameEn: 'Dhamar (Main Office)', lat: 14.5425, lng: 44.4011 },
+  { nameAr: 'ذمار (مقر المكتب الرئيسي)', nameEn: 'Dhamar (Main Office)', lat: 14.55998012643909, lng: 44.3859385889446 },
   { nameAr: 'صنعاء (السبعين)', nameEn: 'Sanaa (Al-Sabeen)', lat: 15.3547, lng: 44.2066 },
   { nameAr: 'عدن (خور مكسر)', nameEn: 'Aden (Khor Maksar)', lat: 12.8256, lng: 45.0347 },
   { nameAr: 'تعز (الحوبان)', nameEn: 'Taiz (Al-Hawban)', lat: 13.5789, lng: 44.0219 },
@@ -67,8 +67,8 @@ export default function SettingsPage() {
 
   // Map Modal State
   const [showMapModal, setShowMapModal] = useState(false);
-  const [tempLat, setTempLat] = useState<number>(14.5425);
-  const [tempLng, setTempLng] = useState<number>(44.4011);
+  const [tempLat, setTempLat] = useState<number>(14.55998012643909);
+  const [tempLng, setTempLng] = useState<number>(44.3859385889446);
   const [tempAddress, setTempAddress] = useState<string>('');
   const mapRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
@@ -108,8 +108,8 @@ export default function SettingsPage() {
 
   // ── Open Map Modal ───────────────────────────────────────────────────
   const openLocationPicker = () => {
-    const lat = parseFloat(form['office_latitude']) || 14.5425;
-    const lng = parseFloat(form['office_longitude']) || 44.4011;
+    const lat = parseFloat(form['office_latitude']) || 14.55998012643909;
+    const lng = parseFloat(form['office_longitude']) || 44.3859385889446;
     setTempLat(lat);
     setTempLng(lng);
     setTempAddress(form['platform_address'] || 'محافظة ذمار، اليمن');
