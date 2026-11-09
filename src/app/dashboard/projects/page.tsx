@@ -285,6 +285,7 @@ export default function ProjectsPage() {
                 <th className="px-5 py-3">{isRtl ? 'الإنجاز' : 'Progress'}</th>
                 <th className="px-5 py-3 hidden lg:table-cell">{isRtl ? 'الميزانية' : 'Budget'}</th>
                 <th className="px-5 py-3">{isRtl ? 'الحالة' : 'Status'}</th>
+                <th className="px-5 py-3 text-center">{isRtl ? 'الإجراءات' : 'Actions'}</th>
               </tr>
             </thead>
             <tbody className={`divide-y ${theme === 'dark' ? 'divide-zinc-800/60' : 'divide-zinc-100'}`}>
@@ -329,11 +330,33 @@ export default function ProjectsPage() {
                     <td className="px-5 py-3.5">
                       <StatusBadge status={project.status} lang={lang} />
                     </td>
+                    <td className="px-5 py-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                      {(project.status === 'COMPLETED' || (project.progressPercentage || 0) >= 100) ? (
+                        <button
+                          type="button"
+                          onClick={() => openPublishModal(project)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-zinc-950 shadow-md transition transform hover:scale-105 cursor-pointer whitespace-nowrap"
+                          title={isRtl ? 'إضافة المشروع إلى المحتوى العام (سابقة أعمال)' : 'Publish to Showcase'}
+                        >
+                          📢 {isRtl ? 'نقل للمحتوى العام' : 'Publish'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => openProgress(project)}
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition cursor-pointer ${
+                            theme === 'dark' ? 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700' : 'bg-zinc-100 border-zinc-200 text-zinc-600 hover:bg-zinc-200'
+                          }`}
+                        >
+                          📈 {isRtl ? 'تحديث' : 'Update'}
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={5} className={`py-14 text-center text-sm italic ${theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>
+                <tr><td colSpan={6} className={`py-14 text-center text-sm italic ${theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>
                   {isRtl ? 'لا توجد مشاريع تطابق الفلتر.' : 'No projects match the current filter.'}
                 </td></tr>
               )}
@@ -356,6 +379,29 @@ export default function ProjectsPage() {
             </div>
 
             <div className="p-5 space-y-4 overflow-y-auto flex-1">
+              {/* Completed Notice Banner with Direct Publish Action */}
+              {(selected.status === 'COMPLETED' || (selected.progressPercentage || 0) >= 100) && (
+                <div className="p-3.5 rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-transparent flex flex-col gap-2.5 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">📢</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-black text-amber-600 dark:text-amber-400">
+                        {isRtl ? 'المشروع مكتمل وجاهز للنشر' : 'Project Completed'}
+                      </div>
+                      <div className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                        {isRtl ? 'يمكنك نقله مباشرة ليظهر كسابقة أعمال في تطبيق الموبايل' : 'Ready to be published to mobile app showcase'}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openPublishModal(selected)}
+                    className="w-full py-2.5 px-3 rounded-xl text-xs font-black bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-zinc-950 shadow-md transition cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    ✨ {isRtl ? 'إضافة المشروع إلى المحتوى العام (سابقة أعمال)' : 'Publish to Public Showcase'}
+                  </button>
+                </div>
+              )}
               {/* Name */}
               <div className={`p-3 rounded-xl border ${theme === 'dark' ? 'bg-zinc-800/40 border-zinc-700/60' : 'bg-zinc-50 border-zinc-200'}`}>
                 <span className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">{isRtl ? 'اسم المشروع' : 'Project Name'}</span>
@@ -438,6 +484,15 @@ export default function ProjectsPage() {
 
             {/* Actions */}
             <div className={`p-4 border-t space-y-2 shrink-0 ${theme === 'dark' ? 'border-zinc-800 bg-zinc-900/60' : 'border-zinc-200 bg-zinc-50'}`}>
+              {(selected.status === 'COMPLETED' || (selected.progressPercentage || 0) >= 100) && (
+                <button
+                  type="button"
+                  onClick={() => openPublishModal(selected)}
+                  className="w-full py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-zinc-950 shadow-md transition cursor-pointer flex items-center justify-center gap-2 mb-2"
+                >
+                  📢 {isRtl ? 'إضافة المشروع إلى المحتوى العام (سابقة أعمال)' : 'Publish to Showcase'}
+                </button>
+              )}
               <button onClick={() => openProgress(selected)}
                 className="w-full py-2.5 rounded-xl text-xs font-bold border border-primary/30 bg-primary/10 text-primary hover:bg-primary/20 transition cursor-pointer flex items-center justify-center gap-2">
                 📈 {isRtl ? 'تحديث نسبة الإنجاز' : 'Update Progress'}
@@ -564,6 +619,15 @@ export default function ProjectsPage() {
               <div>
                 <input type="range" min="0" max="100" value={progressVal} onChange={e => setProgressVal(Number(e.target.value))}
                   className="w-full accent-primary cursor-pointer" aria-label={isRtl ? 'نسبة الإنجاز' : 'Progress percentage'} />
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={() => setProgressVal(100)}
+                    className="w-full py-2 px-3 rounded-lg text-xs font-extrabold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/25 transition cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    ✅ {isRtl ? 'تعيين المشروع كمكتمل فوراً (100%)' : 'Set 100% & Mark Completed'}
+                  </button>
+                </div>
                 <div className={`flex justify-between text-[10px] font-bold mt-1 ${theme === 'dark' ? 'text-zinc-600' : 'text-zinc-400'}`}>
                   <span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span>
                 </div>
