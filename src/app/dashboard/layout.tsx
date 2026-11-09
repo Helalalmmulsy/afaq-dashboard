@@ -23,6 +23,9 @@ const MENU_ITEMS = [
   // Community
   { path: '/dashboard/community', labelKey: 'community', icon: '🌐' },
   
+  // Media and Storage Library
+  { path: '/dashboard/media', labelKey: 'mediaLibrary', icon: '🖼️' },
+  
   // Users & Admin Settings
   { path: '/dashboard/users', labelKey: 'users', icon: '👥' },
   { path: '/dashboard/taxonomies', labelKey: 'taxonomies', icon: '📑' },

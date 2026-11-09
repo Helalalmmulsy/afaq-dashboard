@@ -58,4 +58,27 @@ export const api = {
   put: (path: string, body?: any) => request('PUT', path, body),
   patch: (path: string, body?: any) => request('PATCH', path, body),
   delete: (path: string) => request('DELETE', path),
+  upload: async (path: string, formData: FormData) => {
+    const token = getCookie('token');
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await fetch(`${BASE_URL}${path}`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    if (response.status === 401) {
+      clearCookie('token');
+      if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData?.message || `Upload failed with status ${response.status}`);
+    }
+    return response.json();
+  },
 };
