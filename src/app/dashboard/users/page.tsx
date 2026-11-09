@@ -24,13 +24,52 @@ function RoleBadge({ roleName, roleNameAr, lang }: { roleName: string; roleNameA
   );
 }
 
-function UserAvatar({ name, roleName }: { name: string; roleName: string }) {
+function UserAvatar({
+  name,
+  roleName,
+  profileImage,
+  onClick,
+}: {
+  name: string;
+  roleName: string;
+  profileImage?: string | null;
+  onClick?: (e: React.MouseEvent) => void;
+}) {
   const m = ROLE_META[roleName];
   const initials = name ? name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() : '??';
+  const [imgErr, setImgErr] = useState(false);
+
+  if (profileImage && !imgErr) {
+    return (
+      <div
+        onClick={onClick}
+        className={`w-9 h-9 rounded-xl overflow-hidden shrink-0 border border-zinc-200 dark:border-zinc-700 shadow-sm relative group ${
+          onClick ? 'cursor-pointer hover:ring-2 hover:ring-primary/50 transition' : ''
+        }`}
+        title={onClick ? 'عرض الصورة الشخصية' : name}
+      >
+        <img
+          src={profileImage}
+          alt={name}
+          className="w-full h-full object-cover transition group-hover:scale-110"
+          onError={() => setImgErr(true)}
+        />
+        {onClick && (
+          <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+            <span className="text-white text-[10px]">👁️</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-extrabold shrink-0 border ${
-      m ? `${m.bg} ${m.border} ${m.color}` : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border-zinc-200 dark:border-zinc-700'
-    }`}>
+    <div
+      onClick={onClick}
+      className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-extrabold shrink-0 border ${
+        m ? `${m.bg} ${m.border} ${m.color}` : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border-zinc-200 dark:border-zinc-700'
+      } ${onClick ? 'cursor-pointer' : ''}`}
+    >
       {initials}
     </div>
   );
@@ -49,6 +88,12 @@ export default function UsersPage() {
 
   const [selected, setSelected] = useState<any | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [avatarModalUser, setAvatarModalUser] = useState<any | null>(null);
+
+  const handleCopyUrl = (url: string) => {
+    navigator.clipboard.writeText(url);
+    showAlert(isRtl ? 'تم نسخ رابط الصورة إلى الحافظة! 📋' : 'Image URL copied to clipboard! 📋', 'success');
+  };
   const [form, setForm] = useState({
     name: '', email: '', phone: '', password: '', roleId: '',
     specialization: isRtl ? 'تصميم معماري' : 'Architectural Design',
@@ -277,7 +322,17 @@ export default function UsersPage() {
                     }`}>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <UserAvatar name={user.name} roleName={user.role?.name} />
+                        <UserAvatar
+                          name={user.name}
+                          roleName={user.role?.name}
+                          profileImage={user.profileImage}
+                          onClick={(e) => {
+                            if (user.profileImage) {
+                              e.stopPropagation();
+                              setAvatarModalUser(user);
+                            }
+                          }}
+                        />
                         <div>
                           <div className={`font-bold text-xs leading-tight ${theme === 'dark' ? 'text-zinc-200' : 'text-zinc-700'}`}>{user.name}</div>
                           <div className={`text-[10px] font-mono mt-0.5 ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>{user.email}</div>
@@ -348,15 +403,46 @@ export default function UsersPage() {
 
             <div className="p-5 space-y-4 overflow-y-auto flex-1">
               {/* Avatar + name + role */}
-              <div className={`p-4 rounded-xl border flex items-center gap-3 ${ROLE_META[selected.role?.name]?.bg ?? ''} ${ROLE_META[selected.role?.name]?.border ?? 'border-zinc-200 dark:border-zinc-700'}`}>
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-lg font-extrabold border ${
-                  ROLE_META[selected.role?.name] ? `${ROLE_META[selected.role?.name].bg} ${ROLE_META[selected.role?.name].border} ${ROLE_META[selected.role?.name].color}` : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border-zinc-200 dark:border-zinc-700'
-                }`}>
-                  {selected.name?.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
-                </div>
-                <div>
-                  <div className={`font-extrabold text-sm ${theme === 'dark' ? 'text-zinc-100' : 'text-zinc-800'}`}>{selected.name}</div>
-                  <RoleBadge roleName={selected.role?.name} roleNameAr={selected.role?.nameAr} lang={lang} />
+              <div className={`p-4 rounded-xl border flex items-center gap-3.5 ${ROLE_META[selected.role?.name]?.bg ?? ''} ${ROLE_META[selected.role?.name]?.border ?? 'border-zinc-200 dark:border-zinc-700'}`}>
+                {selected.profileImage ? (
+                  <button
+                    type="button"
+                    onClick={() => setAvatarModalUser(selected)}
+                    className="relative w-14 h-14 rounded-2xl overflow-hidden shrink-0 border-2 border-primary/40 shadow-md group cursor-pointer"
+                    title={isRtl ? 'عرض الصورة الشخصية بالكامل' : 'View full profile photo'}
+                  >
+                    <img
+                      src={selected.profileImage}
+                      alt={selected.name}
+                      className="w-full h-full object-cover transition group-hover:scale-110"
+                      onError={(e: any) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                      <span className="text-white text-xs">🔍</span>
+                    </div>
+                  </button>
+                ) : (
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-extrabold border ${
+                    ROLE_META[selected.role?.name] ? `${ROLE_META[selected.role?.name].bg} ${ROLE_META[selected.role?.name].border} ${ROLE_META[selected.role?.name].color}` : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 border-zinc-200 dark:border-zinc-700'
+                  }`}>
+                    {selected.name?.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className={`font-extrabold text-sm truncate ${theme === 'dark' ? 'text-zinc-100' : 'text-zinc-800'}`}>{selected.name}</div>
+                  <div className="mt-1">
+                    <RoleBadge roleName={selected.role?.name} roleNameAr={selected.role?.nameAr} lang={lang} />
+                  </div>
+                  {selected.profileImage && (
+                    <button
+                      type="button"
+                      onClick={() => setAvatarModalUser(selected)}
+                      className="text-[10px] font-bold text-primary hover:underline mt-1.5 flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>👁️</span>
+                      <span>{isRtl ? 'عرض الصورة الشخصية' : 'View full photo'}</span>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -579,6 +665,85 @@ export default function UsersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ── User Avatar Lightbox Modal ── */}
+      {avatarModalUser && avatarModalUser.profileImage && (
+        <div
+          className="fixed inset-0 bg-black/85 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => setAvatarModalUser(null)}
+        >
+          <div
+            className={`relative max-w-md w-full rounded-2xl border overflow-hidden shadow-2xl ${
+              theme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'
+            }`}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className={`px-5 py-3.5 border-b flex items-center justify-between ${
+              theme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
+            }`}>
+              <div className="flex items-center gap-2.5 truncate">
+                <span className="text-sm">👤</span>
+                <div className="truncate">
+                  <div className={`text-xs font-bold truncate ${theme === 'dark' ? 'text-zinc-200' : 'text-zinc-800'}`}>
+                    {avatarModalUser.name}
+                  </div>
+                  <div className={`text-[10px] font-mono ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                    {avatarModalUser.email}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAvatarModalUser(null)}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500 cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Image Preview */}
+            <div className="p-6 flex flex-col items-center justify-center bg-black/5 dark:bg-black/40">
+              <div className="relative w-64 h-64 rounded-2xl overflow-hidden border-2 border-primary/40 shadow-xl">
+                <img
+                  src={avatarModalUser.profileImage}
+                  alt={avatarModalUser.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className={`px-5 py-3.5 border-t flex items-center justify-between gap-2 ${
+              theme === 'dark' ? 'bg-zinc-900/50 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
+            }`}>
+              <div className="flex items-center gap-1.5">
+                <RoleBadge
+                  roleName={avatarModalUser.role?.name}
+                  roleNameAr={avatarModalUser.role?.nameAr}
+                  lang={lang}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleCopyUrl(avatarModalUser.profileImage)}
+                  className="px-3 py-1.5 text-xs rounded-lg font-bold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition cursor-pointer flex items-center gap-1"
+                >
+                  📋 {isRtl ? 'نسخ الرابط' : 'Copy URL'}
+                </button>
+                <a
+                  href={avatarModalUser.profileImage}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 text-xs rounded-lg font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20 hover:bg-blue-500/20 transition cursor-pointer flex items-center gap-1"
+                >
+                  ↗️ {isRtl ? 'فتح الرابط' : 'Open'}
+                </a>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -44,6 +44,20 @@ const formatPrice = (price: number, currency: string, isRtl: boolean) => {
   return `${formatted} ${symbol}`;
 };
 
+const formatBytes = (bytes: number): string => {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+};
+
+const isImageFile = (filename: string, fileType?: string): boolean => {
+  if (fileType && fileType.startsWith('image/')) return true;
+  const ext = (filename || '').split('.').pop()?.toLowerCase();
+  return ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(ext || '');
+};
+
 export default function RequestsPage() {
   const { lang, theme, showAlert, showConfirm } = useApp();
   const isRtl = lang === 'ar';
@@ -56,6 +70,14 @@ export default function RequestsPage() {
 
   // Side panel
   const [selected, setSelected] = useState<any | null>(null);
+
+  // Lightbox modal for previewing attachments
+  const [lightboxFile, setLightboxFile] = useState<{ url: string; name: string } | null>(null);
+
+  const handleCopyUrl = (url: string) => {
+    navigator.clipboard.writeText(url);
+    showAlert(isRtl ? 'تم نسخ رابط الملف إلى الحافظة! 📋' : 'File URL copied to clipboard! 📋', 'success');
+  };
 
   // Approve modal
   const [approveTarget, setApproveTarget] = useState<any | null>(null);
@@ -274,6 +296,11 @@ export default function RequestsPage() {
                         {req.location && (
                           <span className={`text-[10px] ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>📍 {req.location}</span>
                         )}
+                        {req.attachments && req.attachments.length > 0 && (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/50">
+                            📎 {req.attachments.length} {isRtl ? 'مرفق' : 'files'}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-5 py-3.5 hidden md:table-cell">
@@ -384,6 +411,125 @@ export default function RequestsPage() {
                 </div>
               )}
 
+              {/* Attachments & Project Files */}
+              <div className={`p-3.5 rounded-xl border ${theme === 'dark' ? 'bg-zinc-800/40 border-zinc-700/60' : 'bg-zinc-50 border-zinc-200'}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase flex items-center gap-1.5">
+                    <span>📎</span> {isRtl ? 'المرفقات والمخططات الهندسية' : 'Attachments & Blueprints'}
+                  </span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    selected.attachments && selected.attachments.length > 0
+                      ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
+                      : 'bg-zinc-500/10 text-zinc-500'
+                  }`}>
+                    {selected.attachments ? selected.attachments.length : 0}
+                  </span>
+                </div>
+
+                {(!selected.attachments || selected.attachments.length === 0) ? (
+                  <p className={`text-xs italic py-2 text-center ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                    {isRtl ? 'لم يتم إرفاق أي ملفات مع هذا الطلب.' : 'No attachments submitted with this request.'}
+                  </p>
+                ) : (
+                  <div className="space-y-2 mt-2">
+                    {selected.attachments.map((file: any) => {
+                      const isImg = isImageFile(file.fileName, file.fileType);
+                      const ext = (file.fileName || '').split('.').pop()?.toUpperCase() || 'FILE';
+                      return (
+                        <div
+                          key={file.id || file.fileUrl}
+                          className={`group rounded-xl border p-2.5 transition flex items-center gap-3 ${
+                            theme === 'dark' ? 'bg-zinc-900/60 border-zinc-700/70 hover:border-zinc-600' : 'bg-white border-zinc-200 hover:border-zinc-300'
+                          }`}
+                        >
+                          {/* Thumbnail / Icon */}
+                          {isImg ? (
+                            <button
+                              type="button"
+                              onClick={() => setLightboxFile({ url: file.fileUrl, name: file.fileName })}
+                              className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 border border-zinc-200 dark:border-zinc-700 cursor-pointer group-hover:opacity-90"
+                              title={isRtl ? 'انقر لتكبير الصورة' : 'Click to zoom'}
+                            >
+                              <img
+                                src={file.fileUrl}
+                                alt={file.fileName}
+                                className="w-full h-full object-cover"
+                                onError={(e: any) => { e.currentTarget.style.display = 'none'; }}
+                              />
+                              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
+                                <span className="text-white text-xs">🔍</span>
+                              </div>
+                            </button>
+                          ) : (
+                            <div className="w-12 h-12 rounded-lg shrink-0 flex flex-col items-center justify-center bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800/40 font-mono text-[9px] font-black">
+                              <span className="text-base">📄</span>
+                              <span>{ext}</span>
+                            </div>
+                          )}
+
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <div
+                              className={`text-xs font-bold truncate ${theme === 'dark' ? 'text-zinc-200' : 'text-zinc-700'}`}
+                              title={file.fileName}
+                            >
+                              {file.fileName}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5 text-[10px] text-zinc-400">
+                              <span className="font-mono">{formatBytes(file.fileSize)}</span>
+                              <span>•</span>
+                              <span className="uppercase font-bold text-primary">{ext}</span>
+                            </div>
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-1 shrink-0">
+                            {isImg ? (
+                              <button
+                                type="button"
+                                onClick={() => setLightboxFile({ url: file.fileUrl, name: file.fileName })}
+                                className="p-1.5 rounded-lg text-xs hover:bg-zinc-100 dark:hover:bg-zinc-800 text-blue-500 cursor-pointer"
+                                title={isRtl ? 'معاينة' : 'Preview'}
+                              >
+                                👁️
+                              </button>
+                            ) : (
+                              <a
+                                href={file.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-1.5 rounded-lg text-xs hover:bg-zinc-100 dark:hover:bg-zinc-800 text-blue-500 cursor-pointer"
+                                title={isRtl ? 'فتح الملف' : 'Open'}
+                              >
+                                ↗️
+                              </a>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleCopyUrl(file.fileUrl)}
+                              className="p-1.5 rounded-lg text-xs hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 cursor-pointer"
+                              title={isRtl ? 'نسخ الرابط' : 'Copy URL'}
+                            >
+                              📋
+                            </button>
+                            <a
+                              href={file.fileUrl}
+                              download={file.fileName}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 rounded-lg text-xs hover:bg-zinc-100 dark:hover:bg-zinc-800 text-emerald-500 cursor-pointer"
+                              title={isRtl ? 'تحميل' : 'Download'}
+                            >
+                              ⬇️
+                            </a>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               {/* Date */}
               <div className={`p-3 rounded-xl border ${theme === 'dark' ? 'bg-zinc-800/40 border-zinc-700/60' : 'bg-zinc-50 border-zinc-200'}`}>
                 <span className="block text-[10px] font-bold text-zinc-500 uppercase mb-1">{isRtl ? 'تاريخ الطلب' : 'Submitted'}</span>
@@ -493,6 +639,65 @@ export default function RequestsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ── Image Lightbox Modal ── */}
+      {lightboxFile && (
+        <div
+          className="fixed inset-0 bg-black/85 z-[100] flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={() => setLightboxFile(null)}
+        >
+          <div
+            className={`relative max-w-4xl w-full rounded-2xl border overflow-hidden shadow-2xl ${
+              theme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'
+            }`}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className={`px-5 py-3.5 border-b flex items-center justify-between ${
+              theme === 'dark' ? 'bg-zinc-900/90 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
+            }`}>
+              <div className="flex items-center gap-2 truncate">
+                <span className="text-sm">🖼️</span>
+                <span className={`text-xs font-bold truncate ${theme === 'dark' ? 'text-zinc-200' : 'text-zinc-800'}`}>
+                  {lightboxFile.name}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleCopyUrl(lightboxFile.url)}
+                  className="px-2.5 py-1 text-xs rounded-lg font-bold bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition cursor-pointer flex items-center gap-1"
+                >
+                  📋 {isRtl ? 'نسخ الرابط' : 'Copy Link'}
+                </button>
+                <a
+                  href={lightboxFile.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-2.5 py-1 text-xs rounded-lg font-bold bg-blue-500/10 text-blue-500 border border-blue-500/20 hover:bg-blue-500/20 transition cursor-pointer flex items-center gap-1"
+                >
+                  ↗️ {isRtl ? 'فتح بالكامل' : 'Full View'}
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setLightboxFile(null)}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500 cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Image display */}
+            <div className="p-4 flex items-center justify-center bg-black/5 dark:bg-black/40 max-h-[75vh] overflow-auto">
+              <img
+                src={lightboxFile.url}
+                alt={lightboxFile.name}
+                className="max-h-[70vh] max-w-full object-contain rounded-lg shadow-lg"
+              />
+            </div>
           </div>
         </div>
       )}
