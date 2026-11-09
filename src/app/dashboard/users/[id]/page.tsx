@@ -176,6 +176,13 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
       setRoleTitle(loadedRoleTitle);
       setBioInput(profileObj.bio || '');
 
+      // Auto-persist default timeline if database had null so DB is never out of sync
+      if (res.role?.name === 'ENGINEER' && (!profileObj.customExperiences || !Array.isArray(profileObj.customExperiences) || profileObj.customExperiences.length === 0)) {
+        api.patch(`/users/${id}`, {
+          engineerDetails: { ...profileObj, customExperiences: loadedTimeline }
+        }).catch(() => {});
+      }
+
       setBasicForm({
         name: res.name || '',
         phone: res.phone || '',
