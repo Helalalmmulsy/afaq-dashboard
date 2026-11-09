@@ -73,6 +73,51 @@ export default function ProjectsPage() {
   const [progressTarget, setProgressTarget] = useState<any | null>(null);
   const [progressVal, setProgressVal] = useState(0);
 
+  // Publish to Public Content modal
+  const [publishTarget, setPublishTarget] = useState<any | null>(null);
+  const [publishForm, setPublishForm] = useState({
+    department: 'ENGINEERING',
+    titleAr: '',
+    category: '',
+    coverImage: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&fit=crop&q=80',
+    descriptionAr: '',
+    city: 'محافظة ذمار',
+  });
+
+  const openPublishModal = (project: any) => {
+    setPublishTarget(project);
+    const linkedDept = project.request?.service?.department || 'ENGINEERING';
+    setPublishForm({
+      department: linkedDept,
+      titleAr: project.name || '',
+      category: linkedDept === 'ENGINEERING' ? 'تصميم وإشراف هندسي' : 'مقاولات عامة وتشطيبات',
+      coverImage: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&fit=crop&q=80',
+      descriptionAr: project.description || '',
+      city: 'محافظة ذمار',
+    });
+  };
+
+  const handlePublishSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!publishTarget) return;
+    setSaving(true);
+    try {
+      await api.post(`/services/projects/${publishTarget.id}/publish-showcase`, publishForm);
+      showAlert(
+        isRtl
+          ? 'تم نشر المشروع بنجاح في المحتوى العام للتطبيق تحت قسم ' + (publishForm.department === 'ENGINEERING' ? 'الهندسة' : 'المقاولات') + '!'
+          : 'Project published successfully to app public content!',
+        'success'
+      );
+      setPublishTarget(null);
+      loadData();
+    } catch (err: any) {
+      showAlert(err?.message || (isRtl ? 'فشل نشر المشروع في المحتوى العام.' : 'Failed to publish project.'), 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   async function loadData() {
     setLoading(true);
     try {
@@ -537,6 +582,164 @@ export default function ProjectsPage() {
           </div>
         </div>
       )}
-    </div>
+    
+      {/* ── Publish Completed Project to Public Content Modal ── */}
+      {publishTarget && (
+        <div className="fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className={`w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden max-h-[92vh] flex flex-col ${isRtl ? 'text-right' : 'text-left'} ${theme === 'dark' ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'}`}>
+            <div className={`px-6 py-4 border-b flex items-center justify-between shrink-0 ${theme === 'dark' ? 'bg-zinc-900/80 border-zinc-800' : 'bg-zinc-50 border-zinc-200'}`}>
+              <div className="flex items-center gap-2">
+                <span className="text-xl">📢</span>
+                <div>
+                  <h3 className={`font-extrabold text-sm ${theme === 'dark' ? 'text-zinc-100' : 'text-zinc-800'}`}>
+                    {isRtl ? 'نشر المشروع في المحتوى العام للتطبيق (سابقة أعمال)' : 'Publish Project to App Showcase'}
+                  </h3>
+                  <p className={`text-[10px] ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>
+                    {publishTarget.name}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setPublishTarget(null)} className={`w-7 h-7 rounded-full flex items-center justify-center text-xs cursor-pointer transition ${theme === 'dark' ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400' : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-500'}`} aria-label={isRtl ? 'إغلاق' : 'Close'}>✕</button>
+            </div>
+
+            <form onSubmit={handlePublishSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
+              {/* Department selection */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-500 uppercase mb-2">
+                  {isRtl ? 'القسم في التطبيق *' : 'App Section / Department *'}
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPublishForm({ ...publishForm, department: 'ENGINEERING', category: 'تصميم وإشراف هندسي' })}
+                    className={`p-3 rounded-xl border text-right transition cursor-pointer ${
+                      publishForm.department === 'ENGINEERING'
+                        ? 'border-primary bg-primary/10 text-primary shadow-sm ring-1 ring-primary'
+                        : theme === 'dark' ? 'border-zinc-800 bg-zinc-800/40 text-zinc-400' : 'border-zinc-200 bg-zinc-50 text-zinc-600'
+                    }`}
+                  >
+                    <div className="font-extrabold text-xs">📐 {isRtl ? 'خدمات هندسية' : 'Engineering'}</div>
+                    <div className="text-[10px] opacity-75 mt-0.5">{isRtl ? 'يظهر في تبويب هندسة' : 'Appears in Engineering tab'}</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPublishForm({ ...publishForm, department: 'CONTRACTING', category: 'مقاولات عامة وتشطيبات' })}
+                    className={`p-3 rounded-xl border text-right transition cursor-pointer ${
+                      publishForm.department === 'CONTRACTING'
+                        ? 'border-purple-500 bg-purple-500/10 text-purple-500 shadow-sm ring-1 ring-purple-500'
+                        : theme === 'dark' ? 'border-zinc-800 bg-zinc-800/40 text-zinc-400' : 'border-zinc-200 bg-zinc-50 text-zinc-600'
+                    }`}
+                  >
+                    <div className="font-extrabold text-xs">🏗️ {isRtl ? 'مقاولات وإنشاءات' : 'Contracting'}</div>
+                    <div className="text-[10px] opacity-75 mt-0.5">{isRtl ? 'يظهر في تبويب مقاولات' : 'Appears in Contracting tab'}</div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Title */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-500 uppercase mb-1.5">
+                  {isRtl ? 'عنوان المشروع في التطبيق *' : 'Showcase Title *'}
+                </label>
+                <input
+                  required
+                  value={publishForm.titleAr}
+                  onChange={e => setPublishForm({ ...publishForm, titleAr: e.target.value })}
+                  className={`${inputCls} w-full`}
+                />
+              </div>
+
+              {/* Category / Sub-classification */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-500 uppercase mb-1.5">
+                    {isRtl ? 'التصنيف الفرعي' : 'Sub-Category'}
+                  </label>
+                  <input
+                    value={publishForm.category}
+                    onChange={e => setPublishForm({ ...publishForm, category: e.target.value })}
+                    placeholder={isRtl ? 'مثال: معماري، إنشائي، تشطيبات' : 'e.g. Architectural, Finishes'}
+                    className={`${inputCls} w-full`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-500 uppercase mb-1.5">
+                    {isRtl ? 'المدينة / الموقع' : 'City / Location'}
+                  </label>
+                  <input
+                    value={publishForm.city}
+                    onChange={e => setPublishForm({ ...publishForm, city: e.target.value })}
+                    className={`${inputCls} w-full`}
+                  />
+                </div>
+              </div>
+
+              {/* Image URL & Preview */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-500 uppercase mb-1.5">
+                  {isRtl ? 'رابط صورة المشروع (مع رابط افتراضي ذكي)' : 'Cover Image URL'}
+                </label>
+                <input
+                  type="url"
+                  required
+                  value={publishForm.coverImage}
+                  onChange={e => setPublishForm({ ...publishForm, coverImage: e.target.value })}
+                  className={`${inputCls} w-full`}
+                  dir="ltr"
+                />
+                {publishForm.coverImage && (
+                  <div className="mt-2 h-28 rounded-xl overflow-hidden border border-zinc-700 bg-zinc-950 relative">
+                    <img
+                      src={publishForm.coverImage}
+                      alt="Cover Preview"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&fit=crop&q=80';
+                      }}
+                    />
+                    <span className="absolute bottom-1 right-2 px-2 py-0.5 rounded text-[9px] font-bold bg-black/60 text-white backdrop-blur-sm">
+                      {isRtl ? 'معاينة الغلاف' : 'Cover Preview'}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Description / Additional details */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-500 uppercase mb-1.5">
+                  {isRtl ? 'تفاصيل إضافية عن المشروع (اختياري)' : 'Additional Project Details (Optional)'}
+                </label>
+                <textarea
+                  rows={3}
+                  value={publishForm.descriptionAr}
+                  onChange={e => setPublishForm({ ...publishForm, descriptionAr: e.target.value })}
+                  placeholder={isRtl ? 'اكتب نبذة عن تفاصيل التنفيذ، المواصفات، أو مخرجات المشروع...' : 'Enter details about project execution, specifications...'}
+                  className={`${inputCls} w-full resize-y min-h-[70px]`}
+                />
+              </div>
+
+              <div className={`flex justify-end gap-3 -mx-6 -mb-6 px-6 py-4 border-t ${theme === 'dark' ? 'border-zinc-800 bg-zinc-900/50' : 'border-zinc-200 bg-zinc-50'}`}>
+                <button
+                  type="button"
+                  onClick={() => setPublishTarget(null)}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${theme === 'dark' ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' : 'bg-zinc-200 text-zinc-700 hover:bg-zinc-300'}`}
+                >
+                  {isRtl ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-6 py-2.5 rounded-xl primary-gradient text-zinc-950 font-bold text-xs hover:opacity-90 transition disabled:opacity-60 cursor-pointer flex items-center gap-2 shadow-md shadow-primary/20"
+                >
+                  {saving && <span className="w-3.5 h-3.5 border-2 border-zinc-950/30 border-t-zinc-950 rounded-full animate-spin" />}
+                  <span>🚀</span>
+                  <span>{isRtl ? 'نشر في التطبيق الآن' : 'Publish to App Now'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+</div>
   );
 }

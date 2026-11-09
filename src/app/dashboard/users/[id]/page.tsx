@@ -35,6 +35,7 @@ interface ReviewItem {
   commentAr: string;
   commentEn: string;
   date: string;
+  hidden?: boolean;
 }
 
 interface CertificateItem {
@@ -642,8 +643,45 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
     }
   };
 
+  const handleToggleHideReview = async (revId: string) => {
+    const updatedReviews = reviews.map(r => {
+      if (r.id === revId) {
+        return { ...r, hidden: !r.hidden };
+      }
+      return r;
+    });
+    setReviews(updatedReviews);
+    saveLocalData('reviews', updatedReviews);
+
+    setSaving(true);
+    try {
+      const payload: any = {};
+      if (user.role?.name === 'ENGINEER') {
+        payload.engineerDetails = { ...user.engineerProfile, customReviews: updatedReviews };
+      } else {
+        payload.contractorDetails = { ...user.contractorProfile, customReviews: updatedReviews };
+      }
+      await api.patch(`/users/${id}`, payload);
+      const isNowHidden = updatedReviews.find(r => r.id === revId)?.hidden;
+      showAlert(
+        isNowHidden
+          ? (isRtl ? 'تم إخفاء التقييم من العرض في التطبيق بنجاح' : 'Review hidden from mobile app')
+          : (isRtl ? 'تم إظهار التقييم في التطبيق بنجاح' : 'Review made visible in mobile app'),
+        'success'
+      );
+      loadUser();
+    } catch (err) {
+      showAlert(isRtl ? 'فشل تحديث حالة ظهور التقييم' : 'Failed to update review visibility', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDeleteReview = async (revId: string) => {
-    if (!await showConfirm(isRtl ? 'هل تريد إخفاء أو حذف هذا التقييم؟' : 'Do you want to hide or delete this review?')) return;
+    if (!await showConfirm(
+      isRtl ? 'حذف التقييم نهائياً' : 'Delete Review Permanently',
+      isRtl ? 'هل أنت متأكد من حذف هذا التقييم نهائياً من قاعدة البيانات؟' : 'Are you sure you want to permanently delete this review?'
+    )) return;
     const updatedReviews = reviews.filter(r => r.id !== revId);
     setReviews(updatedReviews);
     saveLocalData('reviews', updatedReviews);
@@ -657,7 +695,7 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
         payload.contractorDetails = { ...user.contractorProfile, customReviews: updatedReviews };
       }
       await api.patch(`/users/${id}`, payload);
-      showAlert(isRtl ? 'تم حذف التقييم بنجاح' : 'Review deleted successfully', 'success');
+      showAlert(isRtl ? 'تم حذف التقييم نهائياً بنجاح' : 'Review deleted successfully', 'success');
       loadUser();
     } catch (err) {
       showAlert(isRtl ? 'فشل حذف التقييم من السيرفر' : 'Failed to delete review on server', 'error');
@@ -1122,24 +1160,57 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
 
                 <div className="divide-y divide-zinc-800/40">
                   {reviews.map(rev => (
-                    <div key={rev.id} className="py-4 first:pt-0 last:pb-0 space-y-2 group relative">
-                      <div className="flex justify-between items-center flex-wrap">
-                        <span className={`font-bold text-xs ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>{isRtl ? rev.authorAr : rev.authorEn}</span>
-                        <div className="flex items-center gap-3">
+                    <div key={rev.id} className={`py-4 first:pt-0 last:pb-0 space-y-2 p-3 rounded-xl transition ${rev.hidden ? 'bg-amber-500/5 border border-dashed border-amber-500/30' : ''}`}>
+                      <div className="flex justify-between items-center flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`font-bold text-xs ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>{isRtl ? rev.authorAr : rev.authorEn}</span>
+                          {rev.hidden && (
+                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                              {isRtl ? 'مخفي من التطبيق' : 'Hidden from App'}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
                           <span className="text-[10px] text-zinc-500 font-mono">{rev.date}</span>
-                          <button onClick={() => handleDeleteReview(rev.id)} className="opacity-0 group-hover:opacity-100 text-[10px] text-red-500 hover:underline transition cursor-pointer">
-                            {isRtl ? 'إخفاء / حذف' : 'Delete'}
+                          
+                          {/* Separate Hide / Show Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleHideReview(rev.id)}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition cursor-pointer flex items-center gap-1 ${
+                              rev.hidden
+                                ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50 hover:bg-emerald-100'
+                                : 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/50 hover:bg-amber-100'
+                            }`}
+                          >
+                            <span>{rev.hidden ? '👁️' : '🙈'}</span>
+                            <span>{rev.hidden ? (isRtl ? 'إظهار في التطبيق' : 'Unhide') : (isRtl ? 'إخفاء من التطبيق' : 'Hide')}</span>
+                          </button>
+
+                          {/* Separate Delete Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteReview(rev.id)}
+                            className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/50 hover:bg-red-100 transition cursor-pointer flex items-center gap-1"
+                          >
+                            <span>🗑️</span>
+                            <span>{isRtl ? 'حذف' : 'Delete'}</span>
                           </button>
                         </div>
                       </div>
                       <div className="flex gap-0.5 text-amber-400 text-xs">
                         {Array.from({ length: 5 }).map((_, idx) => (
-                          <span key={idx} className={idx < rev.rating ? 'text-amber-450' : 'text-zinc-750'}>★</span>
+                          <span key={idx} className={idx < rev.rating ? 'text-amber-400' : 'text-zinc-600'}>★</span>
                         ))}
                       </div>
-                      <p className={`text-xs leading-relaxed italic ${isDark ? 'text-zinc-450' : 'text-zinc-600'}`}>{isRtl ? rev.commentAr : rev.commentEn}</p>
+                      <p className={`text-xs leading-relaxed italic ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>{isRtl ? rev.commentAr : rev.commentEn}</p>
                     </div>
                   ))}
+                  {reviews.length === 0 && (
+                    <div className="text-center py-8 text-xs text-zinc-500 italic">
+                      {isRtl ? 'لا توجد تقييمات مسجلة بعد لهذا الحساب.' : 'No reviews recorded yet.'}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

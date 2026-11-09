@@ -19,7 +19,6 @@ const SETTING_META: Record<string, {
   about_us:         { labelAr: 'نبذة عن المكتب (من نحن)',     labelEn: 'About the Office',      group: 'about',    icon: '📝', type: 'textarea', placeholder: 'نبذة تعريفية شاملة عن مكتب آفاق العرب...' },
   company_vision:   { labelAr: 'رؤية المكتب',                 labelEn: 'Company Vision',        group: 'about',    icon: '🎯', type: 'textarea', placeholder: 'الريادة والتميز في تقديم أرقى الخدمات...' },
   company_mission:  { labelAr: 'رسالة المكتب وقيمه',          labelEn: 'Company Mission',       group: 'about',    icon: '🚀', type: 'textarea', placeholder: 'تقديم تصاميم وإشراف وتنفيذ هندسي دقيق...' },
-  company_team_info:{ labelAr: 'معلومات فريق العمل والتطوير', labelEn: 'Team & Development Info',group: 'about',    icon: '👥', type: 'textarea', placeholder: 'فريق استشاري وتقني متكامل...' },
   
   platform_address: { labelAr: 'العنوان الفعلي للمكتب',        labelEn: 'Physical Office Address',group: 'location', icon: '📍', type: 'text',     placeholder: 'محافظة ذمار، اليمن' },
   office_latitude:  { labelAr: 'دائرة العرض (Latitude)',       labelEn: 'Latitude',              group: 'location', icon: '🌐', type: 'text',     placeholder: '14.559980' },
@@ -44,7 +43,7 @@ const SETTING_META: Record<string, {
 
 const GROUP_META = {
   platform: { labelAr: 'هوية المنصة والشعار',   labelEn: 'Platform & Branding',  icon: '🏢', color: 'text-blue-600 dark:text-blue-400',       bg: 'bg-blue-50 dark:bg-blue-500/10',       border: 'border-blue-200 dark:border-blue-500/20',       bar: 'bg-blue-500' },
-  about:    { labelAr: 'نبذة عنا وفريق العمل',  labelEn: 'About Us & Team',      icon: '🏛️', color: 'text-amber-600 dark:text-amber-400',     bg: 'bg-amber-50 dark:bg-amber-500/10',     border: 'border-amber-200 dark:border-amber-500/20',     bar: 'bg-amber-500' },
+  about:    { labelAr: 'نبذة عن المكتب والرؤية والرسالة',  labelEn: 'About Us, Vision & Mission',      icon: '🏛️', color: 'text-amber-600 dark:text-amber-400',     bg: 'bg-amber-50 dark:bg-amber-500/10',     border: 'border-amber-200 dark:border-amber-500/20',     bar: 'bg-amber-500' },
   location: { labelAr: 'موقع المكتب والخريطة',  labelEn: 'Office Location & Maps',icon: '📍', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-500/20', bar: 'bg-emerald-500' },
   social:   { labelAr: 'منصات التواصل الاجتماعي',labelEn: 'Social Media Channels',icon: '🌐', color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-500/10',   border: 'border-indigo-200 dark:border-indigo-500/20',   bar: 'bg-indigo-500' },
   contact:  { labelAr: 'بيانات التواصل الأساسية',labelEn: 'Contact Details',     icon: '📞', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10', border: 'border-emerald-200 dark:border-emerald-500/20', bar: 'bg-emerald-500' },
@@ -237,7 +236,7 @@ export default function SettingsPage() {
     reader.readAsDataURL(file);
   };
 
-  // Group settings by category
+  // Group all defined settings by category
   const grouped: Record<keyof typeof GROUP_META, any[]> = {
     platform: [],
     about: [],
@@ -247,11 +246,16 @@ export default function SettingsPage() {
     ai: [],
   };
 
-  settings.forEach(s => {
-    const m = SETTING_META[s.key];
+  Object.keys(SETTING_META).forEach(key => {
+    const m = SETTING_META[key];
     if (m?.group && grouped[m.group]) {
-      grouped[m.group].push(s);
-    } else {
+      grouped[m.group].push({ key, value: form[key] || '' });
+    }
+  });
+
+  // Also include any unexpected keys from DB under platform
+  settings.forEach(s => {
+    if (!SETTING_META[s.key]) {
       grouped.platform.push(s);
     }
   });
@@ -302,7 +306,7 @@ export default function SettingsPage() {
       </div>
 
       {/* ── Overview cards ── */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         {(Object.entries(GROUP_META) as [keyof typeof GROUP_META, typeof GROUP_META.platform][]).map(([key, g]) => (
           <div key={key} className={`rounded-xl border p-3 ${g.bg} ${g.border}`}>
             <div className="flex items-center gap-2 mb-1">
