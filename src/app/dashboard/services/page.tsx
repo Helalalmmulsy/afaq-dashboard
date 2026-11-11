@@ -5,6 +5,15 @@ import { api } from '../../../lib/api';
 import { useApp } from '../../../context/AppContext';
 
 type Dept = 'ALL' | 'ENGINEERING' | 'CONTRACTING';
+type SubCat = 'ALL' | 'ARCH' | 'STRUCT' | 'CONSULT' | 'CONCRETE' | 'FINISH';
+
+const SUBCAT_META: Record<string, { dept: 'ENGINEERING' | 'CONTRACTING'; label: string; labelEn: string; icon: string; badge: string }> = {
+  ARCH:     { dept: 'ENGINEERING', label: 'معماري وتصميم',   labelEn: 'Architectural',  icon: '📐', badge: 'bg-teal-50 dark:bg-teal-950/30 text-teal-600 dark:text-teal-400 border-teal-200 dark:border-teal-800/60' },
+  STRUCT:   { dept: 'ENGINEERING', label: 'إنشائي وإشراف',   labelEn: 'Structural',     icon: '🏛️', badge: 'bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/60' },
+  CONSULT:  { dept: 'ENGINEERING', label: 'استشارات هندسية', labelEn: 'Consulting',     icon: '💡', badge: 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800/60' },
+  CONCRETE: { dept: 'CONTRACTING', label: 'خرسانة وعظم',     labelEn: 'Concrete & Core',icon: '🧱', badge: 'bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-800/60' },
+  FINISH:   { dept: 'CONTRACTING', label: 'تشطيبات وترميم',  labelEn: 'Finishes & Reno',icon: '🎨', badge: 'bg-pink-50 dark:bg-pink-950/30 text-pink-600 dark:text-pink-400 border-pink-200 dark:border-pink-800/60' },
+};
 
 const DEPT_META = {
   ENGINEERING: {
@@ -53,6 +62,17 @@ function DeptBadge({ dept, lang }: { dept: string; lang: string }) {
   );
 }
 
+function SubCatBadge({ subCategory, lang }: { subCategory?: string | null; lang: string }) {
+  if (!subCategory) return null;
+  const m = SUBCAT_META[subCategory.toUpperCase()];
+  if (!m) return null;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${m.badge}`}>
+      {m.icon} {lang === 'ar' ? m.label : m.labelEn}
+    </span>
+  );
+}
+
 export default function ServicesPage() {
   const { lang, theme, showAlert, showConfirm } = useApp();
   const isRtl = lang === 'ar';
@@ -60,14 +80,17 @@ export default function ServicesPage() {
   const [services, setServices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [filterDept, setFilterDept] = useState<Dept>('ALL');
+  const [filterSubCat, setFilterSubCat] = useState<SubCat>('ALL');
   const [search, setSearch] = useState('');
 
   const [selected, setSelected] = useState<any | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [editingService, setEditingService] = useState<any | null>(null);
   const [form, setForm] = useState({
-    nameAr: '', nameEn: '', department: 'ENGINEERING',
+    nameAr: '', nameEn: '', department: 'ENGINEERING', subCategory: 'ARCH',
+    basePrice: '',
     shortDescriptionAr: '', shortDescriptionEn: '',
     detailedDescriptionAr: '', detailedDescriptionEn: '',
     coverImage: '', status: 'PUBLISHED',
@@ -83,26 +106,72 @@ export default function ServicesPage() {
     finally { setLoading(false); }
   }
 
-  useEffect(() => { loadServices(); }, [filterDept]);
+  useEffect(() => {
+    setFilterSubCat('ALL');
+    loadServices();
+  }, [filterDept]);
 
   const openCreate = () => {
     setEditingService(null);
-    setForm({ nameAr: '', nameEn: '', department: 'ENGINEERING', shortDescriptionAr: '', shortDescriptionEn: '', detailedDescriptionAr: '', detailedDescriptionEn: '', coverImage: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=800', status: 'PUBLISHED' });
+    const defaultDept = filterDept === 'CONTRACTING' ? 'CONTRACTING' : 'ENGINEERING';
+    const defaultSub =
+      defaultDept === 'CONTRACTING'
+        ? (filterSubCat === 'FINISH' ? 'FINISH' : 'CONCRETE')
+        : (['ARCH', 'STRUCT', 'CONSULT'].includes(filterSubCat) ? filterSubCat : 'ARCH');
+    setForm({
+      nameAr: '', nameEn: '', department: defaultDept, subCategory: defaultSub,
+      basePrice: '',
+      shortDescriptionAr: '', shortDescriptionEn: '', detailedDescriptionAr: '', detailedDescriptionEn: '',
+      coverImage: defaultDept === 'CONTRACTING'
+        ? 'https://images.unsplash.com/photo-1541888946425-d81bb19240f5?q=80&w=800'
+        : 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=800',
+      status: 'PUBLISHED',
+    });
     setShowModal(true);
   };
 
   const openEdit = (svc: any) => {
     setEditingService(svc);
-    setForm({ nameAr: svc.nameAr || '', nameEn: svc.nameEn || '', department: svc.department || 'ENGINEERING', shortDescriptionAr: svc.shortDescriptionAr || '', shortDescriptionEn: svc.shortDescriptionEn || '', detailedDescriptionAr: svc.detailedDescriptionAr || '', detailedDescriptionEn: svc.detailedDescriptionEn || '', coverImage: svc.coverImage || '', status: svc.status || 'PUBLISHED' });
+    const dept = svc.department || 'ENGINEERING';
+    setForm({
+      nameAr: svc.nameAr || '', nameEn: svc.nameEn || '', department: dept,
+      subCategory: svc.subCategory || (dept === 'CONTRACTING' ? 'CONCRETE' : 'ARCH'),
+      basePrice: svc.basePrice != null ? String(svc.basePrice) : '',
+      shortDescriptionAr: svc.shortDescriptionAr || '', shortDescriptionEn: svc.shortDescriptionEn || '',
+      detailedDescriptionAr: svc.detailedDescriptionAr || '', detailedDescriptionEn: svc.detailedDescriptionEn || '',
+      coverImage: svc.coverImage || '', status: svc.status || 'PUBLISHED',
+    });
     setShowModal(true);
+  };
+
+  const handleSyncTaxonomies = async () => {
+    setSyncing(true);
+    try {
+      const res = await api.post('/services/sync-taxonomies');
+      showAlert(
+        isRtl
+          ? `تمت المزامنة بنجاح: ${res?.created ?? 0} خدمة مضافة، ${res?.updated ?? 0} محدّثة.`
+          : `Synced successfully: ${res?.created ?? 0} created, ${res?.updated ?? 0} updated.`,
+        'success'
+      );
+      loadServices();
+    } catch (err: any) {
+      showAlert(err?.message || (isRtl ? 'فشلت مزامنة الخدمات.' : 'Sync failed.'), 'error');
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      if (editingService) { await api.patch(`/services/items/${editingService.id}`, form); }
-      else { await api.post('/services/items', form); }
+      const payload = {
+        ...form,
+        basePrice: form.basePrice.trim() === '' ? null : Number(form.basePrice),
+      };
+      if (editingService) { await api.patch(`/services/items/${editingService.id}`, payload); }
+      else { await api.post('/services/items', payload); }
       setShowModal(false);
       loadServices();
     } catch (err: any) {
@@ -128,7 +197,8 @@ export default function ServicesPage() {
   const filtered = services.filter(s => {
     const q = search.toLowerCase();
     const matchSearch = !q || (s.nameAr || '').toLowerCase().includes(q) || (s.nameEn || '').toLowerCase().includes(q) || (s.shortDescriptionAr || '').toLowerCase().includes(q);
-    return matchSearch;
+    const matchSub = filterSubCat === 'ALL' || (s.subCategory || '').toUpperCase() === filterSubCat;
+    return matchSearch && matchSub;
   });
 
   const inputCls = `w-full px-3 py-2 rounded-lg border text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition ${
@@ -169,10 +239,26 @@ export default function ServicesPage() {
               {isRtl ? `${services.length} خدمة مدرجة — ${activeCount} نشطة` : `${services.length} services — ${activeCount} active`}
             </p>
           </div>
-          <button onClick={openCreate} className="px-5 py-2.5 rounded-xl primary-gradient text-zinc-950 font-bold text-sm hover:opacity-90 transition shadow-md flex items-center gap-2">
-            <span>+</span>
-            <span>{isRtl ? 'إضافة خدمة' : 'Add Service'}</span>
-          </button>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              type="button"
+              onClick={handleSyncTaxonomies}
+              disabled={syncing}
+              className={`px-4 py-2.5 rounded-xl border font-bold text-xs transition flex items-center gap-2 cursor-pointer disabled:opacity-60 ${
+                theme === 'dark'
+                  ? 'bg-zinc-800/80 border-zinc-700 text-zinc-200 hover:border-primary/60'
+                  : 'bg-white border-zinc-300 text-zinc-700 hover:border-primary'
+              }`}
+              title={isRtl ? 'مزامنة الخدمات الناقصة من قائمة التصنيفات' : 'Sync services from taxonomies'}
+            >
+              <span className={syncing ? 'animate-spin inline-block' : ''}>🔄</span>
+              <span>{syncing ? (isRtl ? 'جاري المزامنة...' : 'Syncing...') : (isRtl ? 'مزامنة من القوائم' : 'Sync Taxonomies')}</span>
+            </button>
+            <button onClick={openCreate} className="px-5 py-2.5 rounded-xl primary-gradient text-zinc-950 font-bold text-sm hover:opacity-90 transition shadow-md flex items-center gap-2">
+              <span>+</span>
+              <span>{isRtl ? 'إضافة خدمة' : 'Add Service'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -200,20 +286,54 @@ export default function ServicesPage() {
       </div>
 
       {/* ── Filter + Search Bar ── */}
-      <div className={`${card} px-5 py-4 flex flex-wrap gap-3 items-center`}>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder={isRtl ? 'بحث بالاسم أو الوصف...' : 'Search by name or description...'} className={`${inputCls} max-w-xs`} />
-        <div className="flex gap-2">
-          {(['ALL', 'ENGINEERING', 'CONTRACTING'] as Dept[]).map(d => (
-            <button key={d} onClick={() => setFilterDept(d)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer ${
-                filterDept === d ? 'bg-primary text-zinc-950 border-primary' : theme === 'dark' ? 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:border-primary/50' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:border-primary/50'
-              }`}>
-              {d === 'ALL' ? (isRtl ? 'الكل' : 'All') : d === 'ENGINEERING' ? (isRtl ? 'هندسي' : 'Engineering') : (isRtl ? 'مقاولات' : 'Contracting')}
-            </button>
-          ))}
+      <div className={`${card} px-5 py-4 space-y-3`}>
+        <div className="flex flex-wrap gap-3 items-center">
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={isRtl ? 'بحث بالاسم أو الوصف...' : 'Search by name or description...'} className={`${inputCls} max-w-xs`} />
+          <div className="flex gap-2">
+            {(['ALL', 'ENGINEERING', 'CONTRACTING'] as Dept[]).map(d => (
+              <button key={d} onClick={() => setFilterDept(d)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition cursor-pointer ${
+                  filterDept === d ? 'bg-primary text-zinc-950 border-primary' : theme === 'dark' ? 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:border-primary/50' : 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:border-primary/50'
+                }`}>
+                {d === 'ALL' ? (isRtl ? 'الكل' : 'All') : d === 'ENGINEERING' ? (isRtl ? 'هندسي' : 'Engineering') : (isRtl ? 'مقاولات' : 'Contracting')}
+              </button>
+            ))}
+          </div>
+          {loading && <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
+          <span className={`ms-auto text-xs font-semibold ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>{filtered.length} {isRtl ? 'نتيجة' : 'results'}</span>
         </div>
-        {loading && <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />}
-        <span className={`ms-auto text-xs font-semibold ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>{filtered.length} {isRtl ? 'نتيجة' : 'results'}</span>
+
+        {/* Sub-category filter pills */}
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-zinc-200/60 dark:border-zinc-800/80">
+          <span className={`text-[11px] font-bold ${theme === 'dark' ? 'text-zinc-500' : 'text-zinc-400'}`}>
+            {isRtl ? 'التصنيف الفرعي:' : 'Sub-Category:'}
+          </span>
+          {(
+            filterDept === 'ENGINEERING'
+              ? (['ALL', 'ARCH', 'STRUCT', 'CONSULT'] as SubCat[])
+              : filterDept === 'CONTRACTING'
+              ? (['ALL', 'CONCRETE', 'FINISH'] as SubCat[])
+              : (['ALL', 'ARCH', 'STRUCT', 'CONSULT', 'CONCRETE', 'FINISH'] as SubCat[])
+          ).map(sc => {
+            const meta = sc === 'ALL' ? null : SUBCAT_META[sc];
+            return (
+              <button
+                key={sc}
+                type="button"
+                onClick={() => setFilterSubCat(sc)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition cursor-pointer ${
+                  filterSubCat === sc
+                    ? 'bg-primary/20 text-primary border-primary'
+                    : theme === 'dark'
+                    ? 'bg-zinc-800/70 text-zinc-400 border-zinc-700/70 hover:border-primary/40'
+                    : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:border-primary/40'
+                }`}
+              >
+                {sc === 'ALL' ? (isRtl ? 'الكل' : 'All') : `${meta?.icon} ${isRtl ? meta?.label : meta?.labelEn}`}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* ── Two-pane Layout ── */}
@@ -280,7 +400,10 @@ export default function ServicesPage() {
                       </div>
                     </td>
                     <td className="px-5 py-3.5 hidden md:table-cell">
-                      <DeptBadge dept={svc.department} lang={lang} />
+                      <div className="flex flex-col items-start gap-1">
+                        <DeptBadge dept={svc.department} lang={lang} />
+                        <SubCatBadge subCategory={svc.subCategory} lang={lang} />
+                      </div>
                     </td>
                     <td className="px-5 py-3.5 hidden lg:table-cell max-w-xs">
                       <p className={`text-[11px] line-clamp-2 leading-relaxed ${theme === 'dark' ? 'text-zinc-400' : 'text-zinc-500'}`}>
@@ -349,8 +472,16 @@ export default function ServicesPage() {
                   <StatusBadge status={selected.status} lang={lang} />
                 </div>
 
-                {/* Dept chip */}
-                <DeptBadge dept={selected.department} lang={lang} />
+                {/* Dept & Sub-Category chips */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <DeptBadge dept={selected.department} lang={lang} />
+                  <SubCatBadge subCategory={selected.subCategory} lang={lang} />
+                  {selected.basePrice != null && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/60">
+                      💵 {isRtl ? `يبدأ من $${selected.basePrice}` : `From $${selected.basePrice}`}
+                    </span>
+                  )}
+                </div>
 
                 {/* Short description */}
                 {(selected.shortDescriptionAr || selected.shortDescriptionEn) && (
@@ -406,13 +537,45 @@ export default function ServicesPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto flex-1">
-              {/* Department + Status + Cover */}
-              <div className="grid grid-cols-3 gap-4">
+              {/* Department + Sub-Category + Status + Price + Cover */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-[11px] font-bold text-zinc-500 uppercase mb-1.5">{isRtl ? 'القسم *' : 'Department *'}</label>
-                  <select value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} className={inputCls}>
+                  <select
+                    value={form.department}
+                    onChange={e => {
+                      const nextDept = e.target.value;
+                      setForm({
+                        ...form,
+                        department: nextDept,
+                        subCategory: nextDept === 'CONTRACTING' ? 'CONCRETE' : 'ARCH',
+                      });
+                    }}
+                    className={inputCls}
+                  >
                     <option value="ENGINEERING">{isRtl ? 'هندسي واستشاري' : 'Engineering & Consulting'}</option>
                     <option value="CONTRACTING">{isRtl ? 'مقاولات وتشطيبات' : 'Contracting & Building'}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-500 uppercase mb-1.5">{isRtl ? 'التصنيف الفرعي *' : 'Sub-Category *'}</label>
+                  <select
+                    value={form.subCategory}
+                    onChange={e => setForm({ ...form, subCategory: e.target.value })}
+                    className={inputCls}
+                  >
+                    {form.department === 'ENGINEERING' ? (
+                      <>
+                        <option value="ARCH">{isRtl ? '📐 معماري وتصميم' : 'Architectural & Design'}</option>
+                        <option value="STRUCT">{isRtl ? '🏛️ إنشائي وإشراف' : 'Structural & Supervision'}</option>
+                        <option value="CONSULT">{isRtl ? '💡 استشارات هندسية' : 'Engineering Consulting'}</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="CONCRETE">{isRtl ? '🧱 خرسانة وعظم وبناء' : 'Concrete & Core Build'}</option>
+                        <option value="FINISH">{isRtl ? '🎨 تشطيبات وترميم' : 'Finishes & Renovation'}</option>
+                      </>
+                    )}
                   </select>
                 </div>
                 <div>
@@ -424,9 +587,23 @@ export default function ServicesPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-zinc-500 uppercase mb-1.5">{isRtl ? 'رابط صورة الغلاف *' : 'Cover Image URL *'}</label>
-                  <input type="url" required value={form.coverImage} onChange={e => setForm({ ...form, coverImage: e.target.value })} className={inputCls} placeholder="https://..." dir="ltr" />
+                  <label className="block text-[11px] font-bold text-zinc-500 uppercase mb-1.5">{isRtl ? 'السعر يبدأ من ($) - اختياري' : 'Starting Price (USD)'}</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={form.basePrice}
+                    onChange={e => setForm({ ...form, basePrice: e.target.value })}
+                    className={inputCls}
+                    placeholder={isRtl ? 'فارغ = حسب التقييم' : 'Blank = By evaluation'}
+                    dir="ltr"
+                  />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-500 uppercase mb-1.5">{isRtl ? 'رابط صورة الغلاف *' : 'Cover Image URL *'}</label>
+                <input type="url" required value={form.coverImage} onChange={e => setForm({ ...form, coverImage: e.target.value })} className={inputCls} placeholder="https://..." dir="ltr" />
               </div>
 
               {/* Cover image preview */}

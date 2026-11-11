@@ -77,6 +77,7 @@ export default function ProjectsPage() {
   const [publishTarget, setPublishTarget] = useState<any | null>(null);
   const [publishForm, setPublishForm] = useState({
     department: 'ENGINEERING',
+    subCategory: 'ARCH',
     titleAr: '',
     category: '',
     coverImage: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&fit=crop&q=80',
@@ -89,6 +90,7 @@ export default function ProjectsPage() {
     const linkedDept = project.request?.service?.department || 'ENGINEERING';
     setPublishForm({
       department: linkedDept,
+      subCategory: linkedDept === 'ENGINEERING' ? 'ARCH' : 'CONCRETE',
       titleAr: project.name || '',
       category: linkedDept === 'ENGINEERING' ? 'تصميم وإشراف هندسي' : 'مقاولات عامة وتشطيبات',
       coverImage: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&fit=crop&q=80',
@@ -675,7 +677,7 @@ export default function ProjectsPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => setPublishForm({ ...publishForm, department: 'ENGINEERING', category: 'تصميم وإشراف هندسي' })}
+                    onClick={() => setPublishForm({ ...publishForm, department: 'ENGINEERING', subCategory: 'ARCH', category: 'تصميم وإشراف هندسي' })}
                     className={`p-3 rounded-xl border text-right transition cursor-pointer ${
                       publishForm.department === 'ENGINEERING'
                         ? 'border-primary bg-primary/10 text-primary shadow-sm ring-1 ring-primary'
@@ -687,7 +689,7 @@ export default function ProjectsPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPublishForm({ ...publishForm, department: 'CONTRACTING', category: 'مقاولات عامة وتشطيبات' })}
+                    onClick={() => setPublishForm({ ...publishForm, department: 'CONTRACTING', subCategory: 'CONCRETE', category: 'مقاولات عامة وتشطيبات' })}
                     className={`p-3 rounded-xl border text-right transition cursor-pointer ${
                       publishForm.department === 'CONTRACTING'
                         ? 'border-purple-500 bg-purple-500/10 text-purple-500 shadow-sm ring-1 ring-purple-500'
@@ -698,6 +700,31 @@ export default function ProjectsPage() {
                     <div className="text-[10px] opacity-75 mt-0.5">{isRtl ? 'يظهر في تبويب مقاولات' : 'Appears in Contracting tab'}</div>
                   </button>
                 </div>
+              </div>
+
+              {/* Sub-Category selection */}
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-500 uppercase mb-1.5">
+                  {isRtl ? 'التصنيف في التطبيق *' : 'Mobile Filter Category *'}
+                </label>
+                <select
+                  value={publishForm.subCategory}
+                  onChange={e => setPublishForm({ ...publishForm, subCategory: e.target.value })}
+                  className={`${inputCls} w-full`}
+                >
+                  {publishForm.department === 'ENGINEERING' ? (
+                    <>
+                      <option value="ARCH">{isRtl ? '📐 معماري وتصميم' : 'Architectural'}</option>
+                      <option value="STRUCT">{isRtl ? '🏛️ إنشائي وإشراف' : 'Structural'}</option>
+                      <option value="CONSULT">{isRtl ? '💡 استشارات هندسية' : 'Consulting'}</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="CONCRETE">{isRtl ? '🧱 خرسانة وعظم وبناء' : 'Concrete & Core'}</option>
+                      <option value="FINISH">{isRtl ? '🎨 تشطيبات وديكور' : 'Finishes'}</option>
+                    </>
+                  )}
+                </select>
               </div>
 
               {/* Title */}
