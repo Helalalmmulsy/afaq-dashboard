@@ -23,6 +23,11 @@ interface MediaStats {
   imagesCount: number;
   documentsCount: number;
   categoryCounts: Record<string, number>;
+  localFallbackCount?: number;
+  storageMode?: 'R2' | 'LOCAL';
+  bucketName?: string | null;
+  r2PublicUrl?: string | null;
+  lastR2Error?: string | null;
 }
 
 const CATEGORIES = [
@@ -72,6 +77,7 @@ export default function MediaLibraryPage() {
   const [editAltText, setEditAltText] = useState('');
   const [showR2Guide, setShowR2Guide] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchMedia();
@@ -222,10 +228,17 @@ export default function MediaLibraryPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>{isRtl ? 'Cloudflare R2 متصل ونشط' : 'Cloudflare R2 Active'}</span>
-          </div>
+          {stats?.storageMode === 'LOCAL' ? (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              <span>{isRtl ? 'تخزين محلي مؤقت (R2 غير مفعّل)' : 'Local Ephemeral Storage'}</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>{isRtl ? 'Cloudflare R2 متصل ونشط' : 'Cloudflare R2 Active'}</span>
+            </div>
+          )}
 
           <button
             onClick={() => setShowR2Guide(true)}
@@ -236,6 +249,51 @@ export default function MediaLibraryPage() {
           </button>
         </div>
       </div>
+
+      {/* ── Storage Warning Banner (If Local Fallback or Ephemeral Links Detected) ── */}
+      {(stats?.storageMode === 'LOCAL' || (stats?.localFallbackCount || 0) > 0) && (
+        <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-2.5">
+            <span className="text-lg shrink-0">⚠️</span>
+            <div className="space-y-1">
+              {stats?.storageMode === 'LOCAL' ? (
+                <div className="font-bold">
+                  {isRtl
+                    ? 'الخادم يعمل حالياً على التخزين المحلي المؤقت وليس على Cloudflare R2!'
+                    : 'Backend is currently running on ephemeral local storage instead of Cloudflare R2!'}
+                </div>
+              ) : (
+                <div className="font-bold">
+                  {isRtl
+                    ? `يوجد ${stats?.localFallbackCount} ملفات مرفوعة سابقاً على القرص المؤقت قبل تفعيل R2.`
+                    : `${stats?.localFallbackCount} legacy files were uploaded to ephemeral disk before R2 activation.`}
+                </div>
+              )}
+              <div className="opacity-90">
+                {stats?.storageMode === 'LOCAL'
+                  ? (isRtl
+                      ? 'المتغيرات البيئية لـ R2 (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_URL) غير مضافة في بيئة استضافة Render، لذلك تُحذف الصور عند إعادة تشغيل الخادم.'
+                      : 'R2 environment variables are missing in Render hosting settings, so uploaded files disappear when the container restarts.')
+                  : (isRtl
+                      ? 'الملفات الجديدة تُحفظ الآن بشكل دائم في Cloudflare R2، بينما الروابط القديمة (/uploads/) التي اختفت يمكن حذفها وإعادة رفعها.'
+                      : 'New uploads are permanently stored on Cloudflare R2; broken legacy /uploads/ items can be removed or re-uploaded.')}
+              </div>
+              {stats?.lastR2Error && (
+                <div className="font-mono text-[10px] text-red-500 dark:text-red-400">
+                  Last R2 Error: {stats.lastR2Error}
+                </div>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowR2Guide(true)}
+            className="px-3 py-1.5 rounded-lg bg-amber-500 text-zinc-950 font-bold text-xs hover:opacity-90 shrink-0 cursor-pointer"
+          >
+            {isRtl ? 'عرض إعدادات R2' : 'View R2 Config'}
+          </button>
+        </div>
+      )}
 
       {/* ── Statistics Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
@@ -515,12 +573,24 @@ export default function MediaLibraryPage() {
                   onClick={() => setPreviewItem(file)}
                 >
                   {isImg ? (
-                    <img
-                      src={file.fileUrl}
-                      alt={file.altText || file.originalName}
-                      className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
-                      loading="lazy"
-                    />
+                    brokenImages[file.id] ? (
+                      <div className="flex flex-col items-center justify-center p-3 text-center text-amber-500">
+                        <span className="text-2xl mb-1">⚠️</span>
+                        <span className="text-[10px] font-bold">
+                          {file.fileUrl?.includes('/uploads/')
+                            ? (isRtl ? 'ملف محلي مفقود (خادم مؤقت)' : 'Ephemeral file lost')
+                            : (isRtl ? 'تعذّر تحميل الصورة' : 'Image unavailable')}
+                        </span>
+                      </div>
+                    ) : (
+                      <img
+                        src={file.fileUrl}
+                        alt={file.altText || file.originalName}
+                        className="w-full h-full object-cover transition duration-300 group-hover:scale-105"
+                        loading="lazy"
+                        onError={() => setBrokenImages((prev) => ({ ...prev, [file.id]: true }))}
+                      />
+                    )
                   ) : (
                     <div className="flex flex-col items-center justify-center p-3 text-center">
                       <span className="text-3xl mb-1">
@@ -618,11 +688,22 @@ export default function MediaLibraryPage() {
 
             <div className="p-4 max-h-[60vh] overflow-auto flex items-center justify-center bg-zinc-950/20">
               {isImageFile(previewItem.fileType, previewItem.originalName) ? (
-                <img
-                  src={previewItem.fileUrl}
-                  alt={previewItem.altText || previewItem.originalName}
-                  className="max-h-[55vh] object-contain rounded-lg shadow"
-                />
+                brokenImages[previewItem.id] ? (
+                  <div className="p-8 text-center space-y-2 text-amber-500">
+                    <div className="text-4xl">⚠️</div>
+                    <div className="text-sm font-bold">
+                      {isRtl ? 'تعذّر عرض الصورة — الملف غير موجود على الخادم حالياً' : 'Image unavailable on storage server'}
+                    </div>
+                    <div className="text-xs text-zinc-400 font-mono break-all">{previewItem.fileUrl}</div>
+                  </div>
+                ) : (
+                  <img
+                    src={previewItem.fileUrl}
+                    alt={previewItem.altText || previewItem.originalName}
+                    className="max-h-[55vh] object-contain rounded-lg shadow"
+                    onError={() => setBrokenImages((prev) => ({ ...prev, [previewItem.id]: true }))}
+                  />
+                )
               ) : (
                 <div className="p-8 text-center space-y-3">
                   <div className="text-5xl">📄</div>

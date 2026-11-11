@@ -94,10 +94,14 @@ export default function UsersPage() {
     navigator.clipboard.writeText(url);
     showAlert(isRtl ? 'تم نسخ رابط الصورة إلى الحافظة! 📋' : 'Image URL copied to clipboard! 📋', 'success');
   };
+  const DEFAULT_QUALIFICATION = 'بكالوريوس هندسة مدنية - جامعة ذمار (2011)';
+
   const [form, setForm] = useState({
     name: '', email: '', phone: '', password: '', roleId: '',
     specialization: isRtl ? 'تصميم معماري' : 'Architectural Design',
     experienceYears: 5, bio: '', companyName: '',
+    qualifications: [DEFAULT_QUALIFICATION] as string[],
+    newQualification: '',
   });
 
   async function loadData() {
@@ -123,10 +127,40 @@ export default function UsersPage() {
     setSaving(true);
     try {
       const payload: any = { name: form.name, email: form.email, phone: form.phone, password: form.password, roleId: form.roleId };
-      if (selectedRoleName === 'ENGINEER') { payload.specialization = form.specialization; payload.experienceYears = Number(form.experienceYears); payload.bio = form.bio; }
-      else if (selectedRoleName === 'CONTRACTOR') { payload.companyName = form.companyName; payload.experienceYears = Number(form.experienceYears); payload.bio = form.bio; }
+      if (selectedRoleName === 'ENGINEER') {
+        const quals = [
+          ...form.qualifications.map(q => q.trim()).filter(Boolean),
+          ...(form.newQualification.trim() ? [form.newQualification.trim()] : []),
+        ];
+        payload.engineerDetails = {
+          specialization: form.specialization,
+          experienceYears: Number(form.experienceYears),
+          bio: form.bio,
+          qualifications: quals.length > 0 ? quals : [DEFAULT_QUALIFICATION],
+        };
+      } else if (selectedRoleName === 'CONTRACTOR') {
+        payload.contractorDetails = {
+          companyName: form.companyName,
+          experienceYears: Number(form.experienceYears),
+          bio: form.bio,
+        };
+      }
       await api.post('/users', payload);
+      showAlert(isRtl ? 'تم إضافة المستخدم بنجاح' : 'User added successfully', 'success');
       setShowModal(false);
+      setForm({
+        name: '',
+        email: '',
+        phone: '',
+        password: '',
+        roleId: roles[0]?.id || '',
+        specialization: isRtl ? 'تصميم معماري' : 'Architectural Design',
+        experienceYears: 5,
+        bio: '',
+        companyName: '',
+        qualifications: [DEFAULT_QUALIFICATION],
+        newQualification: '',
+      });
       loadData();
     } catch (err: any) {
       showAlert(err?.message || (isRtl ? 'فشلت العملية.' : 'Operation failed.'), 'error');
@@ -476,6 +510,21 @@ export default function UsersPage() {
                       <p className={`text-[11px] leading-relaxed ${theme === 'dark' ? 'text-zinc-300' : 'text-zinc-600'}`}>{selected.engineerProfile.bio}</p>
                     </div>
                   )}
+                  <div>
+                    <span className="block text-[10px] text-zinc-500 mb-1">{isRtl ? 'المؤهلات العلمية والاعتمادات' : 'Qualifications'}</span>
+                    {Array.isArray(selected.engineerProfile.qualifications) && selected.engineerProfile.qualifications.length > 0 ? (
+                      <ul className="space-y-1">
+                        {selected.engineerProfile.qualifications.map((q: string, idx: number) => (
+                          <li key={idx} className={`text-[11px] font-semibold flex items-start gap-1.5 ${theme === 'dark' ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                            <span className="text-emerald-500 mt-0.5">🎓</span>
+                            <span>{q}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <span className="text-[11px] italic text-zinc-500">{isRtl ? 'لا توجد مؤهلات مسجلة' : 'No qualifications listed'}</span>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -630,6 +679,87 @@ export default function UsersPage() {
                   <div>
                     <label className="block text-[11px] font-bold text-zinc-500 uppercase mb-1.5">{isRtl ? 'النبذة المهنية' : 'Bio'}</label>
                     <textarea rows={3} value={form.bio} onChange={e => setForm({ ...form, bio: e.target.value })} className={inputCls} />
+                  </div>
+
+                  {/* Qualifications Editor inside Add Engineer Modal */}
+                  <div className="space-y-2 pt-2 border-t border-blue-500/20">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[11px] font-bold text-zinc-500 uppercase">
+                        🎓 {isRtl ? 'المؤهلات العلمية والاعتمادات' : 'Academic Qualifications'}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!form.qualifications.includes(DEFAULT_QUALIFICATION)) {
+                            setForm({ ...form, qualifications: [...form.qualifications, DEFAULT_QUALIFICATION] });
+                          }
+                        }}
+                        className="text-[10px] font-bold text-blue-500 hover:underline cursor-pointer"
+                      >
+                        {isRtl ? '+ إدراج المؤهل الافتراضي' : '+ Insert Default'}
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {form.qualifications.map((q, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <input
+                            value={q}
+                            onChange={e => {
+                              const next = [...form.qualifications];
+                              next[idx] = e.target.value;
+                              setForm({ ...form, qualifications: next });
+                            }}
+                            placeholder={DEFAULT_QUALIFICATION}
+                            className={inputCls}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setForm({ ...form, qualifications: form.qualifications.filter((_, i) => i !== idx) })}
+                            className="px-2.5 py-2 rounded-lg text-xs font-bold bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20 cursor-pointer shrink-0"
+                            title={isRtl ? 'حذف' : 'Remove'}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={form.newQualification}
+                        onChange={e => setForm({ ...form, newQualification: e.target.value })}
+                        placeholder={isRtl ? 'إضافة مؤهل أو اعتماد إضافي...' : 'Add another qualification...'}
+                        className={inputCls}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (form.newQualification.trim()) {
+                              setForm({
+                                ...form,
+                                qualifications: [...form.qualifications, form.newQualification.trim()],
+                                newQualification: '',
+                              });
+                            }
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (form.newQualification.trim()) {
+                            setForm({
+                              ...form,
+                              qualifications: [...form.qualifications, form.newQualification.trim()],
+                              newQualification: '',
+                            });
+                          }
+                        }}
+                        className="px-3 py-2 rounded-lg text-xs font-bold bg-blue-500/15 text-blue-500 hover:bg-blue-500/25 border border-blue-500/30 cursor-pointer shrink-0"
+                      >
+                        + {isRtl ? 'إضافة' : 'Add'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}

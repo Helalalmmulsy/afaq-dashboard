@@ -70,6 +70,8 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
   const [editingCertIndex, setEditingCertIndex] = useState<number | null>(null);
 
   // Form states
+  const DEFAULT_QUALIFICATION = 'بكالوريوس هندسة مدنية - جامعة ذمار (2011)';
+
   const [basicForm, setBasicForm] = useState({
     name: '',
     phone: '',
@@ -81,7 +83,10 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
     bio: '',
     city: '',
     roleTitle: '',
+    qualifications: [] as string[],
   });
+  const [basicNewQual, setBasicNewQual] = useState('');
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const [projectForm, setProjectForm] = useState({
     titleAr: '',
@@ -105,6 +110,9 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
   });
 
   const [skillInput, setSkillInput] = useState('');
+  const [qualificationInput, setQualificationInput] = useState('');
+  const [editingQualIndex, setEditingQualIndex] = useState<number | null>(null);
+  const [editingQualValue, setEditingQualValue] = useState('');
 
   const [reviewForm, setReviewForm] = useState({
     authorAr: '',
@@ -194,6 +202,7 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
         bio: profileObj.bio || '',
         city: loadedCity,
         roleTitle: loadedRoleTitle,
+        qualifications: Array.isArray(profileObj.qualifications) ? [...profileObj.qualifications] : [],
       });
 
     } catch (err) {
@@ -245,6 +254,47 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
     }
   };
 
+  const handleOpenEditBasic = () => {
+    const profileObj = user?.engineerProfile || user?.contractorProfile || {};
+    setBasicForm({
+      name: user?.name || '',
+      phone: user?.phone || '',
+      email: user?.email || '',
+      profileImage: user?.profileImage || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=400',
+      status: user?.status || 'ACTIVE',
+      specialization: profileObj.specialization || '',
+      experienceYears: profileObj.experienceYears || 0,
+      bio: profileObj.bio || '',
+      city: city || (isRtl ? 'محافظة ذمار' : 'Dhamar Governorate'),
+      roleTitle: roleTitle || '',
+      qualifications: Array.isArray(profileObj.qualifications) ? [...profileObj.qualifications] : [],
+    });
+    setBasicNewQual('');
+    setShowEditBasicModal(true);
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingAvatar(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('category', 'PROFILES');
+      fd.append('altText', `الصورة الشخصية للمستخدم ${basicForm.name || user?.name || ''}`);
+      const res = await api.upload('/media/upload-single', fd);
+      if (res?.file?.fileUrl) {
+        setBasicForm(prev => ({ ...prev, profileImage: res.file.fileUrl }));
+        showAlert(isRtl ? 'تم رفع الصورة بنجاح' : 'Image uploaded successfully', 'success');
+      }
+    } catch (err: any) {
+      showAlert(err?.message || (isRtl ? 'فشل رفع الصورة' : 'Image upload failed'), 'error');
+    } finally {
+      setUploadingAvatar(false);
+      e.target.value = '';
+    }
+  };
+
   // Submit Basic Details Form
   const handleUpdateBasic = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -258,13 +308,17 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
       };
 
       if (user.role?.name === 'ENGINEER') {
+        const cleanQualifications = [
+          ...(basicForm.qualifications || []).map((q) => q.trim()).filter(Boolean),
+          ...(basicNewQual.trim() ? [basicNewQual.trim()] : []),
+        ];
         payload.engineerDetails = {
           specialization: basicForm.specialization,
           experienceYears: Number(basicForm.experienceYears),
           bio: basicForm.bio,
           skills: user.engineerProfile?.skills || [],
           certificates: user.engineerProfile?.certificates || [],
-          qualifications: user.engineerProfile?.qualifications || [],
+          qualifications: cleanQualifications,
           customProjects: user.engineerProfile?.customProjects || projects,
           customExperiences: user.engineerProfile?.customExperiences || timeline,
           customReviews: user.engineerProfile?.customReviews || reviews,
@@ -290,7 +344,9 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
       localStorage.setItem(`user_${id}_city`, basicForm.city);
       localStorage.setItem(`user_${id}_roleTitle`, basicForm.roleTitle);
 
+      setBasicNewQual('');
       setShowEditBasicModal(false);
+      showAlert(isRtl ? 'تم حفظ التعديلات في السيرفر بنجاح' : 'Changes saved to server successfully', 'success');
       loadUser();
     } catch (err) {
       showAlert(isRtl ? 'فشل التحديث.' : 'Failed to update details.', 'error');
@@ -347,6 +403,87 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
       loadUser();
     } catch (err) {
       showAlert(isRtl ? 'فشل حذف المهارة' : 'Failed to delete skill', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ──────── QUALIFICATIONS CRUD (ENGINEER) ────────
+  const handleAddQualification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = qualificationInput.trim();
+    if (!val || user?.role?.name !== 'ENGINEER') return;
+    const currentQuals: string[] = user.engineerProfile?.qualifications || [];
+    const updatedQuals = [...currentQuals, val];
+
+    setSaving(true);
+    try {
+      await api.patch(`/users/${id}`, {
+        engineerDetails: {
+          ...user.engineerProfile,
+          qualifications: updatedQuals,
+        },
+      });
+      setQualificationInput('');
+      showAlert(isRtl ? 'تم إضافة المؤهل العلمي بنجاح' : 'Qualification added successfully', 'success');
+      loadUser();
+    } catch (err) {
+      showAlert(isRtl ? 'فشل إضافة المؤهل العلمي' : 'Failed to add qualification', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveEditQualification = async (index: number) => {
+    const val = editingQualValue.trim();
+    if (!val || user?.role?.name !== 'ENGINEER') return;
+    const currentQuals: string[] = [...(user.engineerProfile?.qualifications || [])];
+    if (index < 0 || index >= currentQuals.length) return;
+    currentQuals[index] = val;
+
+    setSaving(true);
+    try {
+      await api.patch(`/users/${id}`, {
+        engineerDetails: {
+          ...user.engineerProfile,
+          qualifications: currentQuals,
+        },
+      });
+      setEditingQualIndex(null);
+      setEditingQualValue('');
+      showAlert(isRtl ? 'تم تعديل المؤهل العلمي بنجاح' : 'Qualification updated successfully', 'success');
+      loadUser();
+    } catch (err) {
+      showAlert(isRtl ? 'فشل تعديل المؤهل العلمي' : 'Failed to update qualification', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteQualification = async (index: number) => {
+    if (!await showConfirm(
+      isRtl ? 'حذف المؤهل العلمي' : 'Delete Qualification',
+      isRtl ? 'هل أنت متأكد من حذف هذا المؤهل العلمي؟' : 'Are you sure you want to delete this qualification?'
+    )) return;
+    const currentQuals: string[] = user.engineerProfile?.qualifications || [];
+    const updatedQuals = currentQuals.filter((_, i) => i !== index);
+
+    setSaving(true);
+    try {
+      await api.patch(`/users/${id}`, {
+        engineerDetails: {
+          ...user.engineerProfile,
+          qualifications: updatedQuals,
+        },
+      });
+      if (editingQualIndex === index) {
+        setEditingQualIndex(null);
+        setEditingQualValue('');
+      }
+      showAlert(isRtl ? 'تم حذف المؤهل العلمي بنجاح' : 'Qualification deleted successfully', 'success');
+      loadUser();
+    } catch (err) {
+      showAlert(isRtl ? 'فشل حذف المؤهل العلمي' : 'Failed to delete qualification', 'error');
     } finally {
       setSaving(false);
     }
@@ -845,7 +982,7 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
           {/* Action buttons on the side */}
           <div className="flex gap-2.5 shrink-0 self-center md:self-end mt-4 md:mt-0 w-full md:w-auto justify-center">
             <button 
-              onClick={() => setShowEditBasicModal(true)} 
+              onClick={handleOpenEditBasic} 
               className={`px-4 py-2 rounded-xl border text-xs font-black transition cursor-pointer flex items-center gap-1 shadow-sm ${
                 isDark ? 'bg-zinc-800 border-zinc-700 text-zinc-200 hover:bg-zinc-750' : 'bg-zinc-100 border-zinc-250 text-zinc-750 hover:bg-zinc-50'
               }`}
@@ -917,6 +1054,12 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
                 <span className="text-zinc-500">{isRtl ? 'الشهادات والاعتمادات' : 'Certificates'}</span>
                 <span className="text-zinc-400 dark:text-zinc-200">{profile?.certificates?.length || 0}</span>
               </div>
+              {isEngineer && (
+                <div className="flex justify-between text-xs font-bold">
+                  <span className="text-zinc-500">{isRtl ? 'المؤهلات العلمية' : 'Qualifications'}</span>
+                  <span className="text-emerald-500">{profile?.qualifications?.length || 0}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -979,6 +1122,116 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
                     {profile?.bio || (isRtl ? 'لا يوجد نبذة مهنية مكتوبة حالياً.' : 'No biography declared yet.')}
                   </p>
                 </div>
+
+                {isEngineer && (
+                  <div className="pt-4 border-t border-zinc-800/40">
+                    <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
+                      <h4 className="text-xs font-bold text-zinc-450 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>🎓</span>
+                        <span>{isRtl ? 'المؤهلات العلمية والاعتمادات' : 'Academic Qualifications & Accreditations'}</span>
+                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => setQualificationInput(DEFAULT_QUALIFICATION)}
+                        className="text-[11px] font-bold text-emerald-500 hover:underline cursor-pointer"
+                      >
+                        {isRtl ? '+ إدراج المؤهل الافتراضي' : '+ Fill Default'}
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleAddQualification} className="flex gap-2 mb-4">
+                      <input
+                        value={qualificationInput}
+                        onChange={e => setQualificationInput(e.target.value)}
+                        placeholder={DEFAULT_QUALIFICATION}
+                        className={inputCls}
+                      />
+                      <button
+                        type="submit"
+                        disabled={saving || !qualificationInput.trim()}
+                        className="px-4 py-2 rounded-lg bg-emerald-500 text-zinc-950 font-bold text-xs hover:opacity-90 disabled:opacity-50 transition cursor-pointer shrink-0"
+                      >
+                        + {isRtl ? 'إضافة مؤهل' : 'Add'}
+                      </button>
+                    </form>
+
+                    <div className="space-y-2">
+                      {(profile?.qualifications || []).map((qual: string, index: number) => (
+                        <div
+                          key={index}
+                          className={`p-3 rounded-xl border flex items-center justify-between gap-2 transition ${
+                            isDark ? 'bg-zinc-900/50 border-zinc-800' : 'bg-zinc-50 border-zinc-200'
+                          }`}
+                        >
+                          {editingQualIndex === index ? (
+                            <div className="flex-1 flex items-center gap-2">
+                              <input
+                                value={editingQualValue}
+                                onChange={e => setEditingQualValue(e.target.value)}
+                                className={inputCls}
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                disabled={saving}
+                                onClick={() => handleSaveEditQualification(index)}
+                                className="px-3 py-1.5 rounded-lg bg-emerald-500 text-zinc-950 text-xs font-bold cursor-pointer shrink-0"
+                              >
+                                ✓ {isRtl ? 'حفظ' : 'Save'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingQualIndex(null);
+                                  setEditingQualValue('');
+                                }}
+                                className="px-2.5 py-1.5 rounded-lg bg-zinc-700 text-zinc-200 text-xs font-bold cursor-pointer shrink-0"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                                <span className="text-emerald-500 shrink-0">✓</span>
+                                <span className={`text-xs font-bold ${isDark ? 'text-zinc-200' : 'text-zinc-800'}`}>
+                                  {qual}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingQualIndex(index);
+                                    setEditingQualValue(qual);
+                                  }}
+                                  className="px-2 py-1 rounded-lg text-[11px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 hover:bg-amber-500/20 transition cursor-pointer"
+                                  title={isRtl ? 'تعديل' : 'Edit'}
+                                >
+                                  ✏️
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteQualification(index)}
+                                  className="px-2 py-1 rounded-lg text-[11px] font-bold bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition cursor-pointer"
+                                  title={isRtl ? 'حذف' : 'Delete'}
+                                >
+                                  🗑️
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      ))}
+
+                      {(profile?.qualifications || []).length === 0 && (
+                        <div className="text-center py-4 text-xs text-zinc-500 italic">
+                          {isRtl ? 'لا توجد مؤهلات علمية مسجلة حالياً.' : 'No academic qualifications listed yet.'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="pt-4 border-t border-zinc-800/40">
                   <h4 className="text-xs font-bold text-zinc-450 uppercase tracking-wider mb-3">{isRtl ? 'إدارة المهارات والتقنيات' : 'Skills & Expertises'}</h4>
@@ -1261,7 +1514,13 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
             <form onSubmit={handleUpdateBasic} className="p-6 space-y-4 overflow-y-auto flex-1">
               <div>
                 <label className="block text-[11px] font-bold text-zinc-500 uppercase mb-1.5">{isRtl ? 'رابط الصورة الشخصية' : 'Profile Image URL'}</label>
-                <input value={basicForm.profileImage} onChange={e => setBasicForm({ ...basicForm, profileImage: e.target.value })} className={inputCls} dir="ltr" />
+                <div className="flex items-center gap-2">
+                  <input value={basicForm.profileImage} onChange={e => setBasicForm({ ...basicForm, profileImage: e.target.value })} className={inputCls} dir="ltr" />
+                  <label className="px-3 py-2 rounded-lg text-xs font-bold bg-primary/15 text-primary border border-primary/30 hover:bg-primary/25 transition cursor-pointer shrink-0">
+                    {uploadingAvatar ? '...' : (isRtl ? '📤 رفع' : '📤 Upload')}
+                    <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={uploadingAvatar} />
+                  </label>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -1307,6 +1566,94 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
                 <label className="block text-[11px] font-bold text-zinc-500 uppercase mb-1.5">{isRtl ? 'السيرة والنبذة المهنية' : 'Biography'}</label>
                 <textarea rows={3} value={basicForm.bio} onChange={e => setBasicForm({ ...basicForm, bio: e.target.value })} className={inputCls} />
               </div>
+
+              {isEngineer && (
+                <div className={`p-3.5 rounded-xl border space-y-2.5 ${isDark ? 'bg-emerald-950/15 border-emerald-800/40' : 'bg-emerald-50/70 border-emerald-200'}`}>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-extrabold text-emerald-500 uppercase">
+                      🎓 {isRtl ? 'المؤهلات العلمية والاعتمادات' : 'Academic Qualifications & Accreditations'}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!basicForm.qualifications.includes(DEFAULT_QUALIFICATION)) {
+                          setBasicForm(prev => ({
+                            ...prev,
+                            qualifications: [...prev.qualifications, DEFAULT_QUALIFICATION],
+                          }));
+                        }
+                      }}
+                      className="text-[10px] font-bold text-emerald-500 hover:underline cursor-pointer"
+                    >
+                      {isRtl ? '+ إدراج المؤهل الافتراضي' : '+ Insert Default'}
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {basicForm.qualifications.map((q, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          value={q}
+                          onChange={e => {
+                            const updated = [...basicForm.qualifications];
+                            updated[idx] = e.target.value;
+                            setBasicForm(prev => ({ ...prev, qualifications: updated }));
+                          }}
+                          className={inputCls}
+                          placeholder={DEFAULT_QUALIFICATION}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setBasicForm(prev => ({
+                            ...prev,
+                            qualifications: prev.qualifications.filter((_, i) => i !== idx),
+                          }))}
+                          className="px-2.5 py-2 rounded-lg text-xs font-bold bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20 cursor-pointer shrink-0"
+                          title={isRtl ? 'حذف' : 'Remove'}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={basicNewQual}
+                      onChange={e => setBasicNewQual(e.target.value)}
+                      placeholder={isRtl ? 'أضف مؤهل علمي أو اعتماد جديد...' : 'Add new qualification...'}
+                      className={inputCls}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (basicNewQual.trim()) {
+                            setBasicForm(prev => ({
+                              ...prev,
+                              qualifications: [...prev.qualifications, basicNewQual.trim()],
+                            }));
+                            setBasicNewQual('');
+                          }
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (basicNewQual.trim()) {
+                          setBasicForm(prev => ({
+                            ...prev,
+                            qualifications: [...prev.qualifications, basicNewQual.trim()],
+                          }));
+                          setBasicNewQual('');
+                        }
+                      }}
+                      className="px-3 py-2 rounded-lg text-xs font-bold bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25 border border-emerald-500/30 cursor-pointer shrink-0"
+                    >
+                      + {isRtl ? 'إضافة' : 'Add'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className={`flex justify-end gap-3 -mx-6 -mb-6 px-6 py-4 border-t ${isDark ? 'border-zinc-800 bg-zinc-900/50' : 'border-zinc-200 bg-zinc-50'}`}>
                 <button type="button" onClick={() => setShowEditBasicModal(false)} className={`px-5 py-2.5 rounded-xl text-xs font-bold transition cursor-pointer ${isDark ? 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700' : 'bg-zinc-200 text-zinc-700 hover:bg-zinc-300'}`}>
